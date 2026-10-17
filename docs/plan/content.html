@@ -7,6 +7,7 @@
 <h2>Allowed content</h2>
 <ul>
 <li>Markdown (MultiMarkdown flavour) and LaTeX math only.</li>
+<li>These rules cover <em>content</em>. The site's own first-party UI code may use JavaScript from its own origin (see <a href="platform.html">platform</a>); content never can.</li>
 <li>Raw HTML is stripped by default. The admin keeps an <strong>allowlist</strong> of simple HTML 1.0/1.1-era tags that Markdown lacks, for example <code>&lt;sup&gt;</code>, <code>&lt;sub&gt;</code>, <code>&lt;u&gt;</code>, <code>&lt;abbr&gt;</code>. Tags are added only by manual admin approval.</li>
 <li>Allowed tags carry no attributes unless the admin approves specific ones; <code>style</code>, <code>on*</code>, <code>class</code> and <code>id</code> are never allowable. <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;iframe&gt;</code>, <code>&lt;object&gt;</code> and <code>javascript:</code> URLs are never allowable.</li>
 </ul>

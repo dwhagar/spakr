@@ -9,7 +9,10 @@
 <h2>Flask API, and everything goes through it</h2>
 <ul>
 <li>The backend is a <strong>Flask</strong> application served by Apache <code>mod_wsgi</code> (Flask is a WSGI app, so the Apache setup is unchanged). It supersedes the earlier "plain WSGI" default.</li>
-<li>All reads and writes go through a versioned JSON API under <code>/api/v1/</code>. The web UI is a client of that API: server-rendered pages obtain their data and perform their actions only by calling the API (through an in-process client, so there is no second code path for permissions), and nothing in the UI touches the database or git directly. Command-line scripts and the worker use the same service layer the API uses.</li>
+<li>All reads and writes go through a versioned JSON API under <code>/api/v1/</code>. The web UI is a client of that API <strong>over HTTP</strong>: the browser runs first-party JavaScript that calls <code>/api/v1</code>, and nothing in the UI touches the database or git directly. Command-line scripts and the worker use the same service layer the API uses.</li>
+<li><strong>Page delivery</strong>: Flask serves a thin HTML shell and static assets; page content for public reading is also rendered server-side from the API's renderer so pages work without JavaScript and are indexable (SEO). Interactive features (editing, account screens, admin screens, uploads, search-as-you-type) are the JavaScript client.</li>
+<li><strong>JavaScript policy</strong>: only first-party scripts served from the site's own origin, versioned and hashed (no inline script, no third-party CDN). Content authors still cannot add script or CSS (see <a href="content.html">content</a>); the policy applies to the site's code, and the Content-Security-Policy is <code>script-src 'self'</code>.</li>
+<li><strong>Browser calls: sessions, CSRF, CORS</strong>: the UI and API share one origin, so no CORS is needed and cross-origin requests are denied by default (an admin-configured allowlist can enable it for named origins). Login sets a <code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Lax</code> session cookie; state-changing browser requests must also send a CSRF token in a header (double-submit token issued at login) and are rejected without it. API-key requests send <code>Authorization: Bearer</code>, use no cookies, and need no CSRF token. Responses carry <code>Cache-Control: no-store</code> for authenticated data and <code>Vary: Cookie, Authorization</code>.</li>
 <li>The API version is a single integer, part of the URL, and reported in the <code>User-Agent</code> (below) and in responses (<code>X-API-Version</code>).</li>
 <li>Planned libraries: <code>Flask</code>, <code>SQLAlchemy</code> (Core and ORM) with <code>Alembic</code> migrations, <code>marshmallow</code> or <code>pydantic</code> for request validation, <code>Flask-Limiter</code> for rate limits.</li>
 </ul>
@@ -22,6 +25,7 @@
 <tr><td>Mod</td><td>Editor plus revert any edit, hide or delete pages and media, review quarantined uploads, suspend users temporarily.</td></tr>
 <tr><td>Admin</td><td>Everything: site settings, HTML allowlist, upload policy, roles, all users and keys, purge originals.</td></tr>
 </table>
+<p>Visibility in 1.0 is a single GM-only flag on pages; the database reserves a visibility-group column so groups can come later without a data migration of pages.</p>
 <p>Roles are sets of named permissions stored in the database, so admins can adjust them. A user can hold several roles (for example Mod and GM). Anonymous reading is allowed by default.</p>
 
 <h2>User and account editing suite (web UI)</h2>
@@ -33,6 +37,7 @@
 
 <h2>Email flows</h2>
 <ul>
+<li><strong>Sign-up is by invitation only.</strong> There is no public registration endpoint.</li>
 <li><strong>Invitations</strong>: an admin or mod invites an email address with a role; the invitee receives a single-use, expiring link to choose a username and password.</li>
 <li><strong>Password reset</strong>: request by email, single-use expiring link; responses never reveal whether an address exists.</li>
 <li><strong>Email confirmation</strong> for new addresses; security notices for password and email changes.</li>
@@ -46,7 +51,7 @@
 <li>Each key has a set of permissions chosen at creation, an optional expiry and IP restriction, a name, and a last-used timestamp. Keys can be revoked at any time.</li>
 <li><strong>Users</strong> create their own keys, and a key can only carry permissions its owner holds. At every request the key's effective permissions are the intersection of the key's permissions and the owner's <em>current</em> permissions, so losing a role immediately limits that user's keys. Users are limited to a configurable number of active keys (default 10).</li>
 <li><strong>Admins</strong> can create unlimited keys, and can create keys for service use that are not tied to a person (owned by a service account).</li>
-<li>Browser sessions use a cookie with CSRF protection; API-key requests do not use cookies and are exempt from CSRF but rate limited per key.</li>
+<li>Browser sessions use a cookie with CSRF protection (see above); API-key requests do not use cookies and are exempt from CSRF but rate limited per key.</li>
 </ul>
 
 <h2>Outbound HTTP User-Agent</h2>

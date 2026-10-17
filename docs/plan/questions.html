@@ -8,7 +8,9 @@
 <div class="q"><h2>Defaults chosen</h2>
 <table><tr><th>Topic</th><th>Default</th></tr>
 <tr><td>Framework</td><td>Flask (user decision) for the API and UI; the earlier plain-WSGI default is withdrawn</td></tr>
-<tr><td>UI and API</td><td>Server-rendered UI that calls the API through an in-process client; no separate JavaScript app in 1.0</td></tr>
+<tr><td>UI and API</td><td>Decided: the UI is first-party JavaScript calling <code>/api/v1</code> over HTTP, same origin; public reading pages are also server-rendered for SEO and no-JS use</td></tr>
+<tr><td>Sign-up</td><td>Decided: invitation only</td></tr>
+<tr><td>GM-only</td><td>Decided: single flag in 1.0, with a reserved visibility-group column</td></tr>
 <tr><td>ORM and migrations</td><td>SQLAlchemy and Alembic</td></tr>
 <tr><td>Roles</td><td>reader, editor, GM, mod, admin; permission-based and editable by admins</td></tr>
 <tr><td>Key limits</td><td>Non-admin users: up to 10 active API keys, admin adjustable; admins unlimited</td></tr>
@@ -41,10 +43,7 @@
 <h2>Still open</h2>
 <h2>New open questions</h2>
 <ol>
-<li>Should the UI call the API in-process (default) or over HTTP from browser JavaScript? The latter allows a richer UI later but needs site JavaScript from day one.</li>
-<li>Is public self-registration wanted, or invitation only? (Default: invitation only.)</li>
 <li>Which SMTP relay or sender address will the site use?</li>
-<li>Should GM-only stay a single flag, or become per-role groups later?</li>
 <li>Is a fixed relation vocabulary (table) better than free-form relation kinds?</li>
 </ol>
 <p>Earlier questions: Resolved late: video limit 100 MB; originals kept privately after transcoding with an admin purge option.</p>
