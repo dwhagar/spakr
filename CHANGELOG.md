@@ -5,6 +5,17 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 ## [Unreleased]
 
 ### Added
+- Content-side research (RES.1, RES.2, RES.3, RES.4, RES.7, RES.8, RES.10, RES.11 done; new RES.25 caching done) as pages under `docs/research` with a research index, backed by experiments on Ubuntu 24.04: Markdown engines compared, MathML maths with Temml, the nh3 sanitiser against 23 hostile inputs, git access benchmarks and a locking test, MySQL FULLTEXT trials up to 50,000 pages, ImageMagick policy and ffmpeg checks, a strict-CSP browser test and cache timings. Prototype scripts in `docs/research/poc/`; tested ImageMagick policy in `examples/imagemagick-policy.xml`.
+- New item RND.7 (link-status pass after the render cache).
+
+### Changed
+- Markdown is Python-Markdown with MultiMarkdown-style extensions and YAML front matter (no true MultiMarkdown engine is packaged for Ubuntu 24.04); maths is rendered to MathML by Temml; sanitising is nh3 with a fixed Markdown baseline plus admin-approved tags (RND.1 to RND.3). Plan pages (architecture, content, data model, deployment) updated to match.
+- Git access is the `git` binary under an exclusive `flock` (GIT.1); rendered pages are cached by content key in per-process memory plus disk, with no Redis (RND.5, SEARCH.10, now needing RES.25).
+- Search: MySQL FULLTEXT server settings (`innodb_ft_min_token_size=2`, stopwords off) are an install requirement with a start-up check, not admin web settings (SEARCH.8); the search document adds split and joined token forms (SEARCH.2).
+- Media: one ImageMagick process writes the whole width ladder under a tight policy file; ffmpeg runs with a protocol whitelist and timeouts (MED.4, MED.5).
+- Open questions added: accept a MultiMarkdown-compatible dialect (RES.1) and Node.js at runtime for maths (RES.2).
+
+### Added
 - Flask API skeleton (API.1, API.7, FND.4): app factory `spakr.api.create_app()` and `spakr/wsgi.py` for Apache mod_wsgi (daemon mode, pass-authorization on); `GET /api/v1/health` reports status, configuration state, the software version (MAJOR.MINOR.BUILD), the integer API version and the database schema version (`unknown` until the database layer lands); a missing or invalid `config.json` leaves the app running, health says `not_configured` (HTTP 503) and every other route answers a 503 problem. All errors are `application/problem+json` with a request id (`X-Request-ID`); every response carries `X-API-Version`; JSON-lines logging to stderr without query strings; OpenAPI served at `/api/v1/openapi.json`. The API version is one constant (`spakr/api/versions.py`); a test fails if the generated OpenAPI description differs from `tests/api_contract.snapshot` or changes without a higher version than main. Shared outbound User-Agent helper `spakr/outbound.py` (`spakr/<version> spakr-api/<n> (+contact)`).
 - Python package skeleton in `src/spakr` with `pyproject.toml` (Python 3.12 or newer, start-up error otherwise), data paths under `/data` (`SPAKR_DATA_DIR` and `SPAKR_CONFIG` overrides), the software version helper and the first tests (FND.1, FND.10).
 - Package skeleton and config loader (FND.1, FND.2, CFG.3): `src/spakr` package for Python 3.12, `pyproject.toml`, frozen settings objects with a `Secret` wrapper, `python -m spakr check-config|version`. A missing or invalid `config.json` ends with a clear message and exit status 2, never a traceback. `paths.data_dir` (default `/data`, git-ignored; `SPAKR_DATA_DIR` overrides it for tests) holds all runtime data.
