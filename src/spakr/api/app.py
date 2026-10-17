@@ -30,7 +30,7 @@ class AppState:
 
 
 def create_app(config: Any | None = None) -> Flask:
-    """Build the app. Pass `config` in tests; otherwise it is loaded from /data/config.json.
+    """Build the app. Pass `config` in tests; otherwise config.json is found and loaded by spakr.config.
 
     A missing or invalid configuration does not stop the app: it starts, logs the
     reason, answers /health with `not_configured` and every other route with a 503.
