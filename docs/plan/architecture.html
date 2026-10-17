@@ -6,7 +6,7 @@
 
 <h2>Stack</h2>
 <table><tr><th>Layer</th><th>Choice</th></tr>
-<tr><td>OS</td><td>Ubuntu 24.04 LTS and the following LTS (26.04)</td></tr>
+<tr><td>OS</td><td>Ubuntu 24.04 LTS (required); 26.04 LTS best effort</td></tr>
 <tr><td>Web server</td><td>Apache 2.4 with <code>mod_wsgi</code> (main app) and <code>mod_cgi</code>/<code>mod_cgid</code> (small standalone scripts), configured by a virtual host file</td></tr>
 <tr><td>Language</td><td>Python 3 (the distribution's version; 3.12 on 24.04)</td></tr>
 <tr><td>Database</td><td>MySQL 8 (accounts, index, relations, settings)</td></tr>
@@ -17,7 +17,7 @@
 <h2>Process model</h2>
 <ul>
 <li><strong>WSGI app</strong>: all page views, editing, login, search. Small framework (default: plain WSGI with a thin router, no heavy dependency).</li>
-<li><strong>CGI</strong>: kept for tiny, isolated endpoints (health check, upload receiver if separate privileges are wanted). Same code library as the WSGI app.</li>
+<li><strong>CGI</strong>: only for a few small scripts, never the main app; kept for tiny, isolated endpoints (health check, upload receiver if separate privileges are wanted). Same code library as the WSGI app.</li>
 <li><strong>Worker</strong>: systemd service consuming the Redis queue. Jobs: render cache warm, reindex, upload scanning and thumbnails, git maintenance (gc), backups.</li>
 <li><strong>Git writes</strong> are serialised with a lock so concurrent saves cannot corrupt the repository. Each save is one commit authored by the logged-in user.</li>
 </ul>
