@@ -1,0 +1,176 @@
+{
+  "api_version": 1,
+  "openapi": {
+    "components": {
+      "schemas": {
+        "Health.f3d0655": {
+          "properties": {
+            "api_version": {
+              "title": "Api Version",
+              "type": "integer"
+            },
+            "configured": {
+              "title": "Configured",
+              "type": "boolean"
+            },
+            "database_version": {
+              "$ref": "#/components/schemas/Health.f3d0655.DatabaseVersion"
+            },
+            "software_version": {
+              "title": "Software Version",
+              "type": "string"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "configured",
+            "software_version",
+            "api_version",
+            "database_version"
+          ],
+          "title": "Health",
+          "type": "object"
+        },
+        "Health.f3d0655.DatabaseVersion": {
+          "properties": {
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Current"
+            },
+            "expected": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Expected"
+            },
+            "state": {
+              "title": "State",
+              "type": "string"
+            }
+          },
+          "required": [
+            "expected",
+            "current",
+            "state"
+          ],
+          "title": "DatabaseVersion",
+          "type": "object"
+        },
+        "ValidationError.ad30e22": {
+          "description": "Model of a validation error response.",
+          "items": {
+            "$ref": "#/components/schemas/ValidationError.ad30e22.ValidationErrorElement"
+          },
+          "title": "ValidationErrorType",
+          "type": "array"
+        },
+        "ValidationError.ad30e22.ValidationErrorElement": {
+          "description": "Model of a validation error response element.",
+          "properties": {
+            "ctx": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Error context"
+            },
+            "loc": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Missing field name",
+              "type": "array"
+            },
+            "msg": {
+              "title": "Error message",
+              "type": "string"
+            },
+            "type": {
+              "title": "Error type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "loc",
+            "msg",
+            "type"
+          ],
+          "title": "ValidationErrorElement",
+          "type": "object"
+        }
+      }
+    },
+    "info": {
+      "title": "spakr API",
+      "version": "1"
+    },
+    "openapi": "3.1.0",
+    "paths": {
+      "/api/v1/health": {
+        "get": {
+          "description": "",
+          "operationId": "get__api_v1_health",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Health.f3d0655"
+                  }
+                }
+              },
+              "description": "OK"
+            },
+            "422": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ValidationError.ad30e22"
+                  }
+                }
+              },
+              "description": "Unprocessable Content"
+            },
+            "503": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Health.f3d0655"
+                  }
+                }
+              },
+              "description": "Service Unavailable"
+            }
+          },
+          "summary": "health <GET>",
+          "tags": []
+        }
+      }
+    },
+    "security": [],
+    "tags": []
+  }
+}

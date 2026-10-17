@@ -16,9 +16,11 @@
     WSGIDaemonProcess spakr user=spakr group=spakr processes=2 threads=8 \
         python-home=/srv/spakr/venv python-path=/srv/spakr/src
     WSGIProcessGroup spakr
-    WSGIScriptAlias / /srv/spakr/src/html/wsgi.py
+    WSGIApplicationGroup %{GLOBAL}
+    WSGIPassAuthorization On
+    WSGIScriptAlias / /srv/spakr/src/spakr/wsgi.py
 
-    <Directory /srv/spakr/src/html>
+    <Directory /srv/spakr/src/spakr>
         Require all granted
     </Directory>
 
