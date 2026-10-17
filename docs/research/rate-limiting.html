@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.12 Rate limiting - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.12: Rate limiting</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks OPS.2 and the throttling parts of AUTH.2, AUTH.5 and MED.1.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li>Use <strong>Flask-Limiter</strong> (4.1.1) with the <strong>Redis</strong> backend. Do not write own counters.</li>
+<li>Limit by the strongest identity available: API key, else signed-in user, else client IP. Login and reset have additional per-account limits.</li>
+<li>Throttle, never lock out: failed logins slow down exponentially, an attacker cannot lock a victim out of their account.</li>
+<li>Defaults live in the settings registry (CFG.2) and are admin-adjustable; the limits table below is the starting set.</li>
+<li>Keep the client-IP rule simple and explicit: use the socket address unless the owner declares trusted proxies.</li>
+</ul>
+
+<h2>Options</h2>
+<table><tr><th>Option</th><th>Findings</th><th>Verdict</th></tr>
+<tr><td>Flask-Limiter 4.1.1</td><td>MIT, released 2025-12-06, Python 3.10 or newer, built on the <code>limits</code> library (5.8.0, MIT, 2026-02-05). Installed and inspected: it offers fixed-window, moving-window and sliding-window-counter strategies, a <code>storage_uri</code> for Redis, <code>headers_enabled</code>, per-limit key functions, <code>on_breach</code>, <code>swallow_errors</code> and <code>in_memory_fallback_enabled</code>.</td><td><strong>Chosen.</strong></td></tr>
+<tr><td>Own Redis counters (INCR plus EXPIRE)</td><td>About 30 lines for a fixed window, but we would also need decorators, per-route overrides, response headers, atomicity for sliding windows and tests. No benefit over a maintained library for this size of project.</td><td>Rejected.</td></tr>
+<tr><td>Apache modules (<code>mod_evasive</code>, <code>mod_security2</code>)</td><td>Packaged on 24.04 (<code>libapache2-mod-evasive</code> 1.10.1, <code>libapache2-mod-security2</code> 2.9.7) but they see only IPs and paths, not users or keys, and mod_evasive is an old per-process counter.</td><td>Not used. Apache's built-in <code>mod_reqtimeout</code> (slow-request protection, enabled on Ubuntu) stays.</td></tr>
+<tr><td>fail2ban on the Apache log</td><td>Packaged (1.0.2). Useful as an optional outer layer against floods, needs root-level setup.</td><td>Documented as optional in the install guide, not part of the app.</td></tr>
+</table>
+<p>Ubuntu 24.04's apt has Flask-Limiter 3.5.1 and 26.04 has 3.12; the venv install (see <a href="packaging.html">RES.15</a>) gives the current 4.x line. Facts above verified from PyPI, the Ubuntu archive and the installed package's signature; documentation sites were not reachable, so behaviour such as exact header names was not read from the docs.</p>
+
+<h2>Starting limits (all adjustable)</h2>
+<table><tr><th>Scope</th><th>Key</th><th>Limit</th><th>Note</th></tr>
+<tr><td>Login attempts</td><td>per IP</td><td>10 per 5 minutes</td><td>Moving window.</td></tr>
+<tr><td>Login attempts</td><td>per account (hash of the submitted username or email, so unknown names are counted too)</td><td>5 per 15 minutes, then delays that double (1 s, 2 s, 4 s ... up to 15 minutes)</td><td>OWASP: count per account and prefer exponential delay to hard lockout. A hard lockout would let anyone block anyone.</td></tr>
+<tr><td>Password reset request</td><td>per address and per IP</td><td>3 per hour per address, 10 per hour per IP</td><td>The response is identical either way (<a href="auth-sessions.html">RES.5</a>).</td></tr>
+<tr><td>Invitation acceptance, token POSTs</td><td>per IP</td><td>10 per hour</td><td>Tokens have 256 bits, so this is abuse control, not the security boundary.</td></tr>
+<tr><td>Anonymous reads (pages, search)</td><td>per IP</td><td>120 per minute; search 30 per minute</td><td>Search is the costly query.</td></tr>
+<tr><td>Signed-in reads</td><td>per user</td><td>300 per minute</td><td></td></tr>
+<tr><td>Writes (create, edit, revert, relations)</td><td>per user</td><td>60 per minute</td><td>Edits take a git write lock, so keep this modest.</td></tr>
+<tr><td>Preview endpoint</td><td>per user</td><td>30 per minute</td><td>Runs the renderer.</td></tr>
+<tr><td>Uploads</td><td>per user</td><td>20 per hour, plus the storage quota</td><td>Admin and mod roles exempt.</td></tr>
+<tr><td>API key requests</td><td>per key</td><td>Key's <code>rate_limit_per_min</code>, default 120</td><td>Column already in the schema.</td></tr>
+</table>
+<p>Signed-in users and keys get limits separate from the anonymous ones, so a busy IP (a shared network) does not throttle signed-in editors. These numbers are my starting values for a small community site, not measured.</p>
+
+<h2>Behaviour</h2>
+<ul>
+<li><strong>Response:</strong> HTTP 429 in the API's standard error format (see <a href="openapi.html">RES.14</a>) with a <code>Retry-After</code> header. Also send the standard rate-limit headers (<code>headers_enabled</code>) so the JavaScript client can back off.</li>
+<li><strong>Redis unavailable:</strong> Flask-Limiter offers an in-memory fallback. Use it (fail open per process) for reads and writes, but keep login and reset <strong>fail closed</strong> for the per-account limits: if Redis is down, throttling defers to the slow Argon2 hash plus the per-process semaphore from RES.5. Document this in the install guide. (Fail-open versus fail-closed is a policy choice; the library options exist as inspected, exact semantics to confirm in OPS.2.)</li>
+<li><strong>Storage:</strong> Redis database separate from the RQ queue database (<code>redis.db</code> in the config example is for RQ; use <code>db + 1</code> for limits and cache) so a queue flush never resets limits and vice versa.</li>
+<li><strong>Admin exemptions:</strong> a configurable allow-list of IPs (monitoring) is exempt from read limits.</li>
+<li><strong>Audit:</strong> a burst of 429s on login for one account is logged once per window, not once per request.</li>
+</ul>
+
+<h2>Client IP behind Apache</h2>
+<ul>
+<li>With mod_wsgi directly behind Apache (the recommended hosting, <a href="apache-hosting.html">RES.16</a>) the socket address is the real client, and <code>request.remote_addr</code> is correct (confirmed in the hosting test: the app saw <code>127.0.0.1</code> for a local client).</li>
+<li>If the site sits behind a CDN or reverse proxy, enable Apache's <code>mod_remoteip</code> with the proxy's address ranges declared as trusted (<code>RemoteIPInternalProxy</code>, <code>RemoteIPHeader</code>). Never trust <code>X-Forwarded-For</code> from arbitrary clients: it is spoofable, and a spoofed value would both evade limits and poison audit logs.</li>
+<li>A config option <code>site.trusted_proxy_count</code> (default 0) feeds Werkzeug's <code>ProxyFix</code> only when the owner sets it.</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>Flask-Limiter documentation text and header names (docs sites unreachable); behaviour was confirmed only from the installed package's constructor options.</li>
+<li>Whether the starting numbers fit real use; they are meant to be tuned after launch from the 429 counts.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>OPS.2 (Flask-Limiter with Redis, limits table, fail-open and fail-closed rules). AUTH.2 and AUTH.5 reference the per-account throttle. QUE.1 (separate Redis databases). New config keys for the registry: <code>site.trusted_proxy_count</code> and the limit values.</p>
+
+</main></body></html>

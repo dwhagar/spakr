@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.20 Settings and secrets implementation - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.20: Settings and secrets implementation</h1>
+<p><em>Research thread B, 2026-10-17. The approach is decided by the owner: every option holding a secret lives in <code>config.json</code>; everything is editable in the web interface except the MySQL credentials; the app rewrites <code>config.json</code> atomically at mode 0600; secret fields are write-only. This page confirms the implementation details. Unblocks CFG.1 to CFG.7, FND.2, AUTH.8, MAIL.3.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li>One <strong>settings registry</strong> in code (CFG.2) defines every option once. The loader, the admin API, the web forms, the validation, and <code>examples/config.json.example</code> are all generated from it; a CI check fails if the committed example differs from the generated one.</li>
+<li>Each option lives in exactly one place: <strong>secrets and the manual-only database block in <code>config.json</code></strong>; every other web-editable option in the <code>config</code> database table (CFG.4). No option is stored twice, so there is no precedence puzzle.</li>
+<li>Rewrite <code>config.json</code> with a lock file, a temporary file in the same directory, <code>fsync</code> and <code>os.replace</code>. Keep the <code>database</code> block untouched byte-for-value, and refuse writes to it.</li>
+<li>Reload across workers by checking the file's identity (inode, size, modification time) at most once a second.</li>
+</ul>
+
+<h2>Tested: atomic rewrite under contention</h2>
+<p>A proof of concept implemented exactly the write procedure below and ran it with 4 writer processes (50 read-modify-write updates each, different keys) while a fifth process read and parsed the file in a tight loop, on Ubuntu 24.04 with Python 3.13.</p>
+<table><tr><th>Check</th><th>Result</th></tr>
+<tr><td>Updates kept</td><td><strong>200 of 200</strong> (no lost update)</td></tr>
+<tr><td>Reader saw an invalid or partial file</td><td><strong>0 of 5,498 reads</strong></td></tr>
+<tr><td><code>database</code> block preserved</td><td>Yes</td></tr>
+<tr><td>File mode afterwards</td><td><code>0600</code></td></tr>
+<tr><td>Leftover temporary files</td><td>None</td></tr>
+<tr><td>Time</td><td>0.30 s for 200 writes (about 1.5 ms each)</td></tr>
+</table>
+<p>This proves the locking and replace logic on a local filesystem. It does not cover network filesystems (do not put <code>config.json</code> on NFS) or power loss (the <code>fsync</code> calls are there for that case but a crash was not simulated).</p>
+
+<h2>Write procedure (for CFG.5)</h2>
+<ol>
+<li>Open (create if needed) <code>config.json.lock</code> in the same directory and take an exclusive <code>fcntl.flock</code>. Lock a separate file, not <code>config.json</code>, because <code>os.replace</code> changes the file's identity.</li>
+<li>While holding the lock, <strong>re-read</strong> the current file (another worker may have changed it).</li>
+<li>Apply the change to the parsed dict: only keys the registry marks web-editable and not part of <code>database</code>. A secret field accepts a new value or a clear; an empty submission means "unchanged", an explicit <code>null</code> means "clear".</li>
+<li>Validate the complete result against the registry (types, ranges, URL and host formats). On failure return the error and write nothing.</li>
+<li>Write to <code>config.json.tmp.&lt;pid&gt;</code> created with <code>O_CREAT|O_EXCL</code> and mode <code>0600</code>; <code>flush</code> and <code>os.fsync</code> the file; <code>os.replace</code> over <code>config.json</code>; <code>fsync</code> the directory; release the lock.</li>
+<li>Record an audit entry naming the changed keys only (<code>mail.password</code> changed), never values.</li>
+<li>JSON has no comments, so the <code>_about</code> and <code>_note</code> keys in the example are data: the loader ignores keys starting with an underscore, and the writer preserves them and the key order (two-space indent, trailing newline).</li>
+</ol>
+
+<h2>Where the file lives and who owns it</h2>
+<ul>
+<li>Default path <code>/etc/spakr/config.json</code>, overridable with the <code>SPAKR_CONFIG</code> environment variable (development uses a git-ignored <code>config.json</code> in the checkout; <code>.gitignore</code> already ignores every <code>*.json</code>).</li>
+<li>The <strong>directory</strong> must be owned and writable by the app user (<code>spakr:spakr</code>, mode <code>0750</code>) because an atomic replace needs permission to create and rename files there; the file is <code>0600</code>. The Apache <code>www-data</code> user needs no access: mod_wsgi daemon processes and the queue worker run as <code>spakr</code>.</li>
+<li>Never inside the document root; the example vhost also denies <code>*.json</code>.</li>
+<li>The loader refuses to start if the file is readable by group or others and says so (a clear startup error, as CFG.3 asks for the database credentials).</li>
+<li>Hard-fail messages never print values: they name the key and the rule broken.</li>
+</ul>
+
+<h2>Reload across processes (CFG.6)</h2>
+<ul>
+<li>Each WSGI process caches the parsed file with its <code>(st_ino, st_size, st_mtime_ns)</code>. On each request it compares with <code>os.stat</code> at most once per second (one syscall); on change it re-parses and re-validates.</li>
+<li>If the new file is invalid (hand-edit mistake), keep the old configuration, log an error with the key name, and flag the admin settings page and the health check. Do not crash a running site.</li>
+<li>The RQ worker re-checks before each job (jobs are forked per job, so a changed file is picked up naturally); the mail job therefore always uses the current relay password.</li>
+<li>Non-secret settings in the database use a short (5 second) cache per process plus a version counter in Redis that the writer increments; processes poll the counter once a second. Redis outage means the TTL alone applies.</li>
+<li>Options that cannot change live are marked <code>restart_required</code> in the registry (the paths, Redis host, the secret key if it changes the cursor-signing key); the UI shows "applies after restart".</li>
+</ul>
+
+<h2>Secrets handling</h2>
+<ul>
+<li><strong>Write-only API:</strong> reading a secret returns <code>{"configured": true}</code> or <code>false</code>, never the value; writing sends a new value or <code>null</code> to clear.</li>
+<li><strong>In code:</strong> secrets are wrapped in a small <code>Secret</code> type whose <code>repr</code> and <code>str</code> are <code>***</code>, so accidental logging or error pages cannot print them.</li>
+<li><strong>Logs and audit:</strong> request bodies of the settings endpoints are never logged; the audit detail lists key names only.</li>
+<li><strong>Secret key:</strong> <code>secrets.secret_key</code> is only used to sign opaque values such as pagination cursors and short-lived download links (browser sessions are random server-side tokens, <a href="auth-sessions.html">RES.5</a>). Flask 3.1 supports <code>SECRET_KEY_FALLBACKS</code> (found in the installed Flask 3.1.3 source), so rotation keeps old signatures valid for a while: the registry keeps an optional list <code>secrets.secret_key_previous</code>. Changing the key invalidates nobody's login.</li>
+<li><strong>The MySQL password:</strong> never returned or editable through the API or UI (CFG.3). Changing it means editing the file by hand and reloading the app (<code>touch wsgi.py</code>) and the worker.</li>
+<li><strong>Backups:</strong> the file goes into backups encrypted (<a href="backups.html">RES.17</a>).</li>
+<li><strong>Exposure test:</strong> a test requests every settings endpoint and a deliberately triggered error page and asserts that no secret value appears in any response or log line.</li>
+</ul>
+
+<h2>First-run bootstrap (FND.9)</h2>
+<ul>
+<li><code>spakr init-config</code> creates <code>config.json</code> from the example with a freshly generated <code>secret_key</code> (<code>secrets.token_urlsafe(48)</code>) at mode 0600, prompts for the MySQL host, name, user and password, and refuses to overwrite an existing file.</li>
+<li>The admin then signs in (created by <code>spakr create-admin</code>, AUTH.11) and fills in the rest on the settings screens, including the SMTP relay and its test message (MAIL.3).</li>
+</ul>
+
+<h2>Registry shape (for CFG.2)</h2>
+<pre>Setting(key="mail.host", type=Host, default="", secret=False,
+        web_editable=True, store="db", restart_required=False,
+        validate=..., label="SMTP relay host", help="...")
+Setting(key="secrets.mail_password", type=SecretStr, secret=True,
+        web_editable=True, store="file", ...)
+Setting(key="database.password", secret=True, web_editable=False, store="file")</pre>
+<p>From it: a validator, the loader's defaults, the OpenAPI schema for the settings endpoints (<a href="openapi.html">RES.14</a>), the form definitions the UI renders, and the example file. Storage follows the committed example: the <code>database</code>, <code>secrets</code>, <code>mail</code>, <code>redis</code>, <code>paths</code> and <code>site</code> blocks stay together in <code>config.json</code> (so the relay is configured in one place, password included); options added later that are neither secret nor bootstrap data go to the database table.</p>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>Behaviour on network filesystems or after a simulated power cut.</li>
+<li>That mod_wsgi's multiple daemon processes all pick up the change within the one-second window (design, not load-tested).</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>RES.20 done. CFG.2 (registry shape and generated example, CI check), CFG.5 (write procedure; tested), CFG.6 (stat-based reload, version counter), CFG.3 (startup permission check), FND.2 (underscore keys, registry-driven loader), FND.9 (<code>init-config</code>), AUTH.8 (key names only in audit).</p>
+
+</main></body></html>

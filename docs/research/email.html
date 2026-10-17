@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.6 Email through an SMTP relay - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.6: Email through an external SMTP relay</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks MAIL.1, MAIL.2, MAIL.3. Decided earlier by the owner: external SMTP relay, never a local MTA; relay settings are configuration (secrets in <code>config.json</code>, the rest editable in the admin settings). The relay provider and sender address are not chosen yet, so nothing below depends on one.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li>Use the Python standard library: <code>smtplib</code> to talk to the relay and <code>email.message.EmailMessage</code> to build messages. No mail framework.</li>
+<li>TLS: <code>starttls</code> on port 587 (the default, upgrade is mandatory: if the relay does not offer STARTTLS the send fails), <code>ssl</code> (implicit TLS) on port 465, and <code>none</code> only when an admin explicitly confirms the relay is on a trusted local network. Certificates are always verified with <code>ssl.create_default_context()</code>.</li>
+<li>Send from a queue job on its own <code>mail</code> RQ queue, with retries for temporary failures, using the existing <code>email_outbox</code> table as the ledger.</li>
+<li>Send plain text plus a simple HTML alternative; no tracking pixels, no remote images, no links except the single action link.</li>
+<li>Settings: the keys already in <code>examples/config.json.example</code> (<code>mail.host</code>, <code>mail.port</code>, <code>mail.tls</code>, <code>mail.username</code>, <code>mail.sender</code>, and the secret <code>secrets.mail_password</code>). Add optional <code>mail.sender_name</code>, <code>mail.reply_to</code> and <code>mail.timeout</code>.</li>
+</ul>
+
+<h2>Options considered</h2>
+<table><tr><th>Option</th><th>Verdict</th></tr>
+<tr><td>stdlib <code>smtplib</code> and <code>EmailMessage</code></td><td><strong>Chosen.</strong> Zero dependencies; the volume is tiny (invitations, resets, notices). Blocking calls are fine inside a queue worker.</td></tr>
+<tr><td>Flask-Mail, Flask-Mailman</td><td>Thin wrappers over the same stdlib calls tied to Flask settings; our settings come from the settings registry (CFG.2). Not needed.</td></tr>
+<tr><td>aiosmtplib</td><td>Async; nothing in the stack is async. Not needed.</td></tr>
+<tr><td>Provider HTTP APIs (not SMTP)</td><td>Outside the decision (the owner chose an SMTP relay). A relay that only offers HTTP could be added later behind the same <code>send()</code> function.</td></tr>
+<tr><td>Local MTA (Postfix, msmtp)</td><td>Excluded by the owner's decision.</td></tr>
+</table>
+
+<h2>Verified</h2>
+<table><tr><th>Fact</th><th>How verified</th></tr>
+<tr><td><code>EmailMessage</code> refuses header values containing a line break (raises <code>ValueError</code> for both <code>Subject</code> and <code>To</code>), so header injection through a user-supplied name or subject fails loudly instead of sending.</td><td>Ran it (Python 3.13 here; same behaviour documented for the modern policy used on 3.12). <strong>Verified</strong>.</td></tr>
+<tr><td><code>email-validator</code> 2.3.0, Unlicense, released 2025-08-25; <code>aiosmtpd</code> 1.4.6 (Apache-2.0, 2024-05-18; apt <code>python3-aiosmtpd</code> 1.4.4 on 24.04).</td><td>PyPI and Ubuntu archive. <strong>Verified</strong>.</td></tr>
+<tr><td>RQ 2.12.0 (BSD-2, 2026-08-30) is current; Ubuntu 24.04's apt has 1.16.1.</td><td>PyPI and Ubuntu archive. <strong>Verified</strong>. RQ has a <code>Retry</code> option with per-attempt intervals (from memory of its API; confirm at QUE.1).</td></tr>
+<tr><td>The OWASP Forgot Password and Authentication cheat sheets set the reset-mail rules (generic response, side channel, notice after change).</td><td>Read directly. <strong>Verified</strong>; details in <a href="auth-sessions.html">RES.5</a>.</td></tr>
+</table>
+
+<h2>Sending rules</h2>
+<ul>
+<li><strong>Connection:</strong> port 587: <code>SMTP(host, 587, timeout=30)</code>, <code>ehlo()</code>, <code>starttls(context=ctx)</code>, <code>ehlo()</code>, <code>login(user, password)</code>, <code>send_message()</code>, <code>quit()</code>. Port 465: <code>SMTP_SSL(host, 465, context=ctx, timeout=30)</code>. The password comes from the write-only secret; it is never logged, and exception messages are scrubbed before they reach <code>email_outbox.last_error</code>.</li>
+<li><strong>Headers:</strong> <code>From</code> is the configured sender (optionally with the site name as display name, quoted by <code>EmailMessage</code>), <code>Date</code>, <code>Message-ID</code> from <code>email.utils.make_msgid(domain=&lt;sender domain&gt;)</code>, <code>Auto-Submitted: auto-generated</code> (so autoresponders do not reply; RFC 3834, from memory), optional <code>Reply-To</code>. Subjects are fixed templates; user-supplied text only appears in the body.</li>
+<li><strong>Recipients:</strong> exactly one recipient per message; the address is validated and lower-cased when the invitation or account is created.</li>
+<li><strong>Retries:</strong> connection errors, timeouts and 4xx replies retry with growing delays (about 1, 5, 15 and 60 minutes, then give up after 5 attempts). 5xx replies (bad recipient, rejected sender, authentication refused) fail at once and set <code>state = failed</code> with the SMTP reply text for the admin. A failed authentication also raises a visible admin warning, because every message will fail until the password is fixed.</li>
+<li><strong>Throttle:</strong> a single worker process for the <code>mail</code> queue sends serially, which keeps the site under typical relay rate limits. A per-hour cap is an admin setting.</li>
+<li><strong>Tokens in the outbox:</strong> the invitation or reset token has to be in the message, so the payload holds it until the mail is sent. Clear the token field when the message is sent, when it fails permanently, and in any case when the token expires.</li>
+<li><strong>Test message:</strong> MAIL.3's "send test message" runs the same code path synchronously with a short timeout and returns the SMTP reply or a categorised error (cannot connect, TLS failed, authentication failed, sender rejected).</li>
+</ul>
+
+<h2>SPF, DKIM and DMARC notes</h2>
+<p>These are DNS settings for the sender domain, done by the site owner with the relay provider's instructions. General practice (from my own knowledge; no provider has been chosen, so none of this was checked against provider documentation):</p>
+<ul>
+<li>Send from an address on a domain you control (for example <code>noreply@yourdomain</code>), not from the relay's domain and not from a free-mail address.</li>
+<li><strong>SPF:</strong> publish the provider's <code>include:</code> in the domain's SPF record so the relay is an authorised sender.</li>
+<li><strong>DKIM:</strong> enable DKIM signing at the relay; the provider gives one to three DNS records to add. The signing domain should match (align with) the <code>From</code> domain.</li>
+<li><strong>DMARC:</strong> start with <code>v=DMARC1; p=none</code> and an address for reports, move to <code>quarantine</code> once reports show your own mail passing.</li>
+<li>The admin settings page shows these three checks as a reminder and the test message lets the owner see where a message lands; the app cannot verify DNS from the settings screen.</li>
+</ul>
+
+<h2>Testing</h2>
+<ul>
+<li>Unit tests build messages and assert headers, links and absence of the token after sending.</li>
+<li>Integration tests run a throwaway SMTP server in the test process (<code>aiosmtpd</code>, dev dependency only) and assert what arrives, including the STARTTLS-required failure case and a permanent-failure case.</li>
+</ul>
+
+<h2>Open points for the owner</h2>
+<ul>
+<li>Which relay and sender address will be used (still open as MAIL.1's input). The design works with any standard SMTP relay.</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>Provider-specific behaviour (limits, port availability, DKIM steps): none chosen.</li>
+<li>RFC 3834 header semantics and RQ <code>Retry</code> details were recalled, not re-read.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>MAIL.1 (stdlib, TLS modes above), MAIL.2 (templates, token wiping, <code>mail</code> queue), MAIL.3 (categorised test result), QUE.1 and QUE.2 (separate named queues, see <a href="platform-conventions.html">platform conventions</a>).</p>
+
+</main></body></html>

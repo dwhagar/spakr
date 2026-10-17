@@ -4,6 +4,17 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 
 ## [Unreleased]
 
+### Added
+- Platform and security research (RES.5, RES.6, RES.9, RES.12, RES.14, RES.15, RES.16, RES.17, RES.18, RES.20 done) as pages under `docs/research`, with experiments run on Ubuntu 24.04: Flask, pydantic and argon2 under apt mod_wsgi, file-type sniffing, an OpenAPI spike and atomic `config.json` rewrites under contention. Plus a platform conventions page (queue, logging, MySQL, outbound HTTP, testing and CI, privacy).
+- New suggested items: AUTH.12 (user data export), MED.9 (optional ClamAV scan), MED.10 (captions and transcripts), DOC.7 (privacy page).
+
+### Changed
+- CSRF design is a synchronizer token tied to the server session plus a Fetch Metadata check, replacing the double-submit token (RES.5, AUTH.2); invitation and reset tokens travel in the URL fragment and are consumed by a POST (AUTH.4, AUTH.5); API keys cannot manage keys or account security (AUTH.6).
+- Hosting: apt mod_wsgi in daemon mode must set `WSGIPassAuthorization On` or the app never sees `Authorization: Bearer` (verified), plus `WSGIApplicationGroup %{GLOBAL}` (FND.3, FND.6).
+- Packaging: Python libraries come from a hashed virtualenv lock, not apt (24.04 ships SQLAlchemy 1.4 and pydantic 1.10); PyMySQL (MIT) is the MySQL driver instead of the GPL mysqlclient (FND.1, DB.1).
+- Backups become one `spakr backup` / `spakr restore` command pair (OPS.5, FND.9); the daily CI run opens an issue when it fails (FND.7); API validation and OpenAPI use pydantic v2 with SpecTree (API.3).
+- Git commits use a pseudonymous per-account identity so history never holds personal data (GIT.1, conventions page).
+
 ### Changed
 - Decided: the app rewrites `config.json` atomically at mode 0600; secret fields are write-only in the UI. RES.20 now only confirms implementation details (CFG.5).
 - Email goes through an external SMTP relay, never a local MTA; relay settings and sender address are configuration (MAIL.1 unblocked, RES.6 reworded).

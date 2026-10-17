@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.17 Backups - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.17: Backups</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks OPS.5 and DB.4; informs DOC.3.</em></p>
+
+<h2>Recommendation</h2>
+<p>One command, <code>spakr backup</code>, writes a dated snapshot directory containing every piece of state, then (optionally) hands it to a standard off-site tool. Restore is <code>spakr restore</code>, and a restore round trip is tested in the daily CI job.</p>
+<table><tr><th>Piece</th><th>Method</th><th>Why</th></tr>
+<tr><td>MySQL (accounts, index, settings, audit)</td><td><code>mysqldump --single-transaction --routines --triggers --events --hex-blob</code> piped through <code>zstd</code>; credentials from a 0600 option file the script writes from <code>config.json</code> (never on the command line)</td><td><code>--single-transaction</code> takes a consistent InnoDB snapshot without locking writers; the option names are from MySQL practice and are re-checked against the installed client when OPS.5 is built. Not run here (no MySQL server in the research environment).</td></tr>
+<tr><td>Git content store</td><td><code>git bundle create content.bundle --all</code> and <code>git bundle verify</code></td><td>A bundle is one self-contained file taken atomically from the refs, so a write in progress cannot give a half-copied repository. <strong>Tested here</strong>: created a bundle from a two-commit repository, verified it and cloned it back with both commits intact.</td></tr>
+<tr><td>Media originals and published variants</td><td><code>rsync -a --link-dest=&lt;previous snapshot&gt;</code> of the originals tree and media tree</td><td>Directories are named by content hash and never change after publishing, so incrementals are cheap and hard-linked snapshots cost almost no space. Variants can be regenerated from originals, so an admin option may skip them to save space. Not run here (rsync was not installed in the research environment).</td></tr>
+<tr><td><code>config.json</code></td><td>Copied into the snapshot, encrypted</td><td>Holds the MySQL password, the secret key and the relay password.</td></tr>
+<tr><td>Redis</td><td><strong>Not backed up</strong></td><td>Queue jobs, rate counters and caches are disposable. The rule that makes this safe: every job has a database row recording its desired state (<code>media.state</code>, <code>email_outbox.state</code>), and <code>spakr requeue-stuck</code> re-enqueues rows stuck in <code>processing</code> or <code>queued</code> after a restore or crash.</td></tr>
+<tr><td>Manifest</td><td><code>manifest.json</code> in the snapshot: spakr version, Alembic revision, git HEAD, file list with SHA-256, timestamp</td><td>Restore refuses a snapshot from a newer schema and can verify integrity before touching anything.</td></tr>
+</table>
+
+<h2>Order and consistency</h2>
+<ol>
+<li>Take the git write lock briefly (GIT.1) only to read refs for the bundle; releases immediately.</li>
+<li>Dump MySQL (consistent snapshot).</li>
+<li>rsync media (immutable trees; a file that arrives during the copy is picked up next run).</li>
+<li>Write the manifest last. Because git is the source of truth for text and MySQL's page index can be rebuilt (DB.3), small skew between the bundle and the dump is repaired by <code>spakr reindex</code> after a restore.</li>
+</ol>
+
+<h2>Encryption and off-site copies</h2>
+<ul>
+<li>Backups contain password hashes, email addresses, GM-only content and the config secrets, so anything leaving the machine is encrypted.</li>
+<li>Options in the Ubuntu 24.04 archive: <code>age</code> 1.1.1 (encrypt to a public key, private key kept offline), <code>restic</code> 0.16.4 (deduplicated, encrypted repositories over SFTP, S3-compatible storage or rclone; <code>rclone</code> 1.60.1), <code>borgbackup</code> 1.2.8, <code>zstd</code> 1.5.5. Versions are from the archive listing; none were run.</li>
+<li><strong>Recommended:</strong> the script produces the local snapshot and, when <code>backup.offsite_command</code> is set (admin setting, for example a restic command), runs it afterwards. restic is the suggested default in the install guide; the app has no hard dependency on any of them.</li>
+<li>Optional zero-cost improvement: a configured mirror remote (<code>backup.git_mirror</code>) that the queue pushes to after each content commit, which gives near-zero data loss for page text.</li>
+</ul>
+
+<h2>Schedule and retention (defaults, admin-adjustable)</h2>
+<ul>
+<li>Nightly snapshot from a systemd timer (<code>spakr-backup.timer</code>, installed by the install script, with <code>Persistent=true</code> so a missed run happens on next boot).</li>
+<li>Keep 7 daily, 4 weekly and 6 monthly local snapshots; pruning is part of the command.</li>
+<li>Retention doubles as the data-retention statement for deleted accounts (see privacy in <a href="platform-conventions.html">platform conventions</a>): an erased account can persist in backups until they age out.</li>
+<li>The database dump alone gives a recovery point of up to 24 hours for accounts and settings; the git mirror shortens it for content.</li>
+</ul>
+
+<h2>Restore and testing</h2>
+<ul>
+<li><code>spakr restore &lt;snapshot&gt;</code> verifies checksums, refuses to overwrite a non-empty database unless forced, restores MySQL, clones the bundle into the content store, rsyncs media, rebuilds the search index (DB.3), then runs <code>requeue-stuck</code>.</li>
+<li>The daily CI job (07:00 UTC) performs the full cycle on sample content: create, back up, wipe, restore, compare page counts, history and search results. A backup that is never restored is not a backup.</li>
+<li>DB.4 (database backup and restore script) becomes the MySQL step of this command rather than a separate script.</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li><code>mysqldump</code> option behaviour on the shipped client (no MySQL server or client in the research environment), rsync snapshot timing at scale, and restic's behaviour with the chosen target.</li>
+<li>The MySQL 8.0 end-of-support date quoted in some sources was not needed here; Ubuntu 24.04 still receives MySQL 8.0 security builds (8.0.46 in the security pocket, archive listing).</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>OPS.5 (single <code>spakr backup</code> and <code>spakr restore</code> as above), DB.4 (folded into OPS.5's MySQL step, kept as an item), FND.9 (CLI gains <code>backup</code>, <code>restore</code>, <code>requeue-stuck</code>), TST.4 and the daily CI job (restore round trip), DOC.3 (timer and off-site guidance).</p>
+
+</main></body></html>

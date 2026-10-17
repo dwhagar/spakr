@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.16 Apache hosting: mod_wsgi, proxy, CGI - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.16: Apache hosting: mod_wsgi, proxy and CGI</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks FND.3 and FND.6; informs DOC.3.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>mod_wsgi from apt, daemon mode</strong>, running the Flask app as its own user with a virtualenv (as the example vhost already sketches). Add <code>WSGIApplicationGroup %{GLOBAL}</code> and, <strong>essential for API keys, <code>WSGIPassAuthorization On</code></strong>.</li>
+<li>Gunicorn behind <code>mod_proxy</code> is a documented alternative, not part of 1.0.</li>
+<li>CGI is kept for a very small set of scripts whose value is independence from the main app (a health probe, a maintenance page). It adds no capability, so do not grow it.</li>
+</ul>
+
+<h2>Experiment (real, on Ubuntu 24.04)</h2>
+<p>The research environment is Ubuntu 24.04.5. I installed <code>apache2</code> 2.4.58-1ubuntu8.17 and <code>libapache2-mod-wsgi-py3</code> 5.0.0-1build2 from the archive, created a virtualenv with <code>/usr/bin/python3.12</code> and installed Flask 3.1.3, pydantic 2.14.1 (pydantic-core 2.50.1) and argon2-cffi 25.1.0. A tiny app that builds a pydantic model and an Argon2 hash was served on a local port through <code>WSGIDaemonProcess ... python-home=&lt;venv&gt;</code>.</p>
+<table><tr><th>Question</th><th>Result</th></tr>
+<tr><td>Does Flask with pydantic v2 and argon2-cffi (a Rust/PyO3 extension and a cffi extension) run under apt mod_wsgi in a venv?</td><td><strong>Yes.</strong> Two requests in sequence returned HTTP 200 with Python 3.12.3, both with the default per-vhost sub-interpreter and with <code>WSGIApplicationGroup %{GLOBAL}</code>. I saw no import problem in either mode.</td></tr>
+<tr><td>Does the app see an <code>Authorization: Bearer</code> header by default?</td><td><strong>No.</strong> By default the header arrived as <code>null</code>. With <code>WSGIPassAuthorization On</code> the app received <code>Bearer abc123</code>. Without that directive every API-key request would be anonymous.</td></tr>
+<tr><td>What is <code>request.remote_addr</code> with a direct client?</td><td>The client's address (<code>127.0.0.1</code> for the test), so no proxy handling is needed unless the owner puts a proxy in front (<a href="rate-limiting.html">RES.12</a>).</td></tr>
+<tr><td>What went wrong first?</td><td>Python failed at start with <code>No module named 'encodings'</code> because the daemon user could not read the path to the virtualenv (a parent directory was not traversable). The venv and its parents must be readable by the daemon user. A second pitfall: Apache refuses to run as root, so tests ran as <code>www-data</code>; production uses a dedicated <code>spakr</code> user.</td></tr>
+</table>
+<p>Why I still recommend <code>%{GLOBAL}</code> although the default mode worked: sub-interpreters can load extension modules once per interpreter and some C and Rust extensions assume a single main interpreter. That is widely given mod_wsgi advice, from my own knowledge; I did not reproduce a failure, so treat it as a precaution that costs nothing because the daemon group hosts only this one application.</p>
+
+<h2>Options compared</h2>
+<table><tr><th>Option</th><th>Facts</th><th>For</th><th>Against</th></tr>
+<tr><td>mod_wsgi (apt) daemon mode</td><td>apt <code>libapache2-mod-wsgi-py3</code> 5.0.0 on 24.04, 5.0.2 on 26.04; links <code>libpython3.12</code> (checked with <code>ldd</code>).</td><td>One service fewer; matches "Apache, WSGI plus a few CGI" as decided; daemon runs as its own user; the distribution patches it with Python.</td><td>Python version is pinned to the system Python (the venv must be built from it); restarts go through Apache or <code>touch wsgi.py</code>; systemd sandboxing applies to Apache as a whole, not to the app only.</td></tr>
+<tr><td>mod_wsgi from PyPI</td><td>6.1.1 (Apache-2.0, 2026-10-13).</td><td>Newer; independent of the apt build.</td><td>Needs <code>apache2-dev</code> and a compiler, a custom <code>LoadModule</code> line, and rebuilds per Python upgrade. Hold in reserve if the apt build ever lags.</td></tr>
+<tr><td>Gunicorn behind <code>mod_proxy_http</code> / unix socket</td><td>apt gunicorn 20.1.0 on 24.04; PyPI 26.2.0 (MIT).</td><td>Own systemd unit with sandbox options; restart the app without touching Apache; any Python version.</td><td>Second service and extra proxy modules; one more hop; <code>X-Forwarded-*</code> handling to get right.</td></tr>
+</table>
+<p>No benchmark was run; at this scale throughput is not the deciding factor.</p>
+
+<h2>Starting daemon settings for FND.6</h2>
+<pre>WSGIDaemonProcess spakr user=spakr group=spakr processes=2 threads=8 \
+    python-home=/srv/spakr/venv python-path=/srv/spakr/src \
+    display-name=%{GROUP} maximum-requests=5000 graceful-timeout=20 \
+    request-timeout=300 socket-timeout=120
+WSGIProcessGroup spakr
+WSGIApplicationGroup %{GLOBAL}
+WSGIPassAuthorization On</pre>
+<p>The first five options come from the example vhost and the directive tests above. <code>maximum-requests</code>, <code>request-timeout</code> and <code>socket-timeout</code> values are my starting suggestions from general mod_wsgi practice and were not tested; the timeouts must cover a 100 MB video upload on a slow link (<a href="uploads.html">RES.9</a>). Reload the code without restarting Apache with <code>touch /srv/spakr/src/html/wsgi.py</code> (standard mod_wsgi daemon behaviour).</p>
+
+<h2>Other vhost points</h2>
+<ul>
+<li><strong>Upload limit:</strong> the example's global <code>LimitRequestBody 10485760</code> blocks 100 MB video; set the larger limit in the upload route's <code>&lt;Location&gt;</code> only.</li>
+<li><strong>Static and media:</strong> Apache serves <code>static/</code> and the published media tree directly with long <code>Cache-Control</code> (paths contain hashes). The private originals and quarantine trees have no <code>Alias</code> and sit outside the document root.</li>
+<li><strong>Protocols:</strong> enable <code>h2</code> with the event MPM (<code>Protocols h2 http/1.1</code>); <code>mod_deflate</code> for text.</li>
+<li><strong>Security headers:</strong> the application sets them for dynamic responses so that tests cover them (RND.4); the vhost sets <code>nosniff</code>, HSTS and the strict CSP for static files.</li>
+<li><strong>Denied paths:</strong> <code>.git</code> and <code>*.json</code> are denied in the example already; <code>config.json</code> lives outside the document root anyway (<a href="settings-config.html">RES.20</a>).</li>
+<li><strong>TLS certificates:</strong> certbot (2.9.0 on 24.04) with the Apache plugin, or Apache's built-in <code>mod_md</code>; the install guide picks one (not researched further).</li>
+</ul>
+
+<h2>CGI: what stays</h2>
+<ul>
+<li>With the event MPM (Ubuntu's default) CGI runs through <code>mod_cgid</code>; confirm the module is enabled in FND.6.</li>
+<li>Each CGI request starts a new Python process (tens of milliseconds), fine for rare calls, wrong for anything busy.</li>
+<li>Python 3.13 removed the standard <code>cgi</code> and <code>cgitb</code> modules (PEP 594), so the scripts must not import them; they only print headers and a body. This matters for 26.04 (Python 3.14).</li>
+<li>Candidates worth keeping as CGI: <code>health.py</code> (checks MySQL, Redis, queue depth, disk, without loading Flask, so monitoring works even when the app is broken) and <code>maintenance.py</code> (static "upgrade in progress" answer, used by the upgrade script). Everything else belongs in the Flask app.</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>mod_wsgi 5.0.2 with Python 3.14 on 26.04 (not installed).</li>
+<li>The suggested timeout and <code>maximum-requests</code> values, behaviour under load, and the failure mode of sub-interpreters with PyO3 modules (not reproduced).</li>
+<li>Python 3.12 only; the test environment's default <code>python3</code> was a newer interpreter, so the venv was built explicitly from <code>python3.12</code>.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>FND.3 (<code>wsgi.py</code> with the three directives above; CGI limited to health and maintenance), FND.6 (vhost: pass-authorization, application group, per-route upload limit, <code>mod_cgid</code>), AUTH.6 and API.4 (depends on the pass-authorization directive), DOC.3 (venv readable by the daemon user; touch-to-reload).</p>
+
+</main></body></html>

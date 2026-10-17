@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.18 Accessibility checklist (WCAG 2.2 AA) - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.18: Accessibility checklist (WCAG 2.2 AA)</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks OPS.4; supplies the content for UI.13 (the acceptance checklist every UI item meets). Standard: WCAG 2.2 level AA.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li>Target <strong>WCAG 2.2 AA</strong> for every screen and for rendered content; treat the checklist below as part of "done" for each UI item (UI.13), checked while building, not in a final pass.</li>
+<li>Test with both machines and people: an automated axe-core run on every key page in the daily CI job, plus a manual keyboard and screen-reader pass before each release (OPS.4).</li>
+<li>Keep the editor a plain Markdown textarea in 1.0 (no rich-text widget); it is the most accessible option and matches the decided Markdown-only content model.</li>
+</ul>
+
+<h2>Standard facts</h2>
+<ul>
+<li>WCAG 2.2 became a W3C Recommendation on 5 October 2023 (confirmed by several secondary sources; w3.org itself was not reachable). It adds nine success criteria and removes 4.1.1 Parsing. The ones at level A and AA that matter to this site: 2.4.11 Focus Not Obscured (Minimum), 2.5.7 Dragging Movements, 2.5.8 Target Size (Minimum), 3.2.6 Consistent Help, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication (Minimum). Criterion numbers and levels were confirmed by search; the exact thresholds below (24 CSS pixel targets, and so on) are from my own knowledge of the standard and should be read in the normative text when UI.13 is finalised.</li>
+<li>Status of WCAG as a legal requirement differs by country and by the owner's situation; this research does not give legal advice. It is mentioned because EU rules for many commercial sites follow WCAG-based standards (from memory).</li>
+</ul>
+
+<h2>The checklist</h2>
+<p>Each item is a testable statement. "Auto" means axe-core can detect most failures; "manual" means a person must check.</p>
+
+<h3>Structure and navigation</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Landmarks: one <code>header</code>, <code>nav</code> (labelled when more than one), <code>main</code>, <code>footer</code>; search form inside <code>role="search"</code></td><td>1.3.1, 2.4.1</td><td>auto and manual</td></tr>
+<tr><td>"Skip to content" link first in the tab order, visible on focus</td><td>2.4.1</td><td>manual</td></tr>
+<tr><td>One <code>h1</code> per page; headings in order; unique, descriptive <code>&lt;title&gt;</code> (also needed for SEO); <code>lang</code> on <code>html</code></td><td>1.3.1, 2.4.2, 3.1.1</td><td>auto</td></tr>
+<tr><td>Consistent navigation and help placement across pages (the help or contact link is in the same place everywhere)</td><td>3.2.3, 3.2.4, 3.2.6</td><td>manual</td></tr>
+<tr><td>Link text makes sense out of context; wiki links to missing pages are marked by more than colour</td><td>2.4.4, 1.4.1</td><td>manual</td></tr>
+<tr><td>Pagination, search results, breadcrumbs are labelled <code>nav</code> regions; the current page is marked with <code>aria-current</code></td><td>1.3.1, 4.1.2</td><td>auto</td></tr>
+</table>
+
+<h3>Keyboard and focus</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Everything works with the keyboard alone, no keyboard traps, logical tab order that follows the visual order</td><td>2.1.1, 2.1.2, 2.4.3</td><td>manual</td></tr>
+<tr><td>Visible focus indicator on every control with contrast at least 3:1 against the surroundings, in both light and dark themes (use <code>:focus-visible</code>)</td><td>2.4.7, 1.4.11</td><td>auto (contrast) and manual</td></tr>
+<tr><td>A focused element is never completely hidden by a sticky header, banner or dialog (offset with <code>scroll-padding-top</code>)</td><td>2.4.11 (new in 2.2)</td><td>manual</td></tr>
+<tr><td>Anything done by dragging (reordering relation kinds, galleries) also has a click or key alternative</td><td>2.5.7 (new)</td><td>manual</td></tr>
+<tr><td>Pointer targets at least 24 by 24 CSS pixels (aim for 44 on touch layouts)</td><td>2.5.8 (new)</td><td>auto and manual</td></tr>
+<tr><td>Dialogs: native <code>&lt;dialog&gt;</code> or equivalent, focus moves in, returns to the trigger on close, Escape closes</td><td>2.4.3, 4.1.2</td><td>manual</td></tr>
+<tr><td>No single-key shortcuts without a way to turn them off or remap</td><td>2.1.4</td><td>manual</td></tr>
+</table>
+
+<h3>Colour, themes and layout (ties to the responsive and dark-mode standing requirement)</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Text contrast at least 4.5:1 (3:1 for large text); UI component and graphic contrast at least 3:1; <strong>both themes</strong>. A script reads the CSS theme tokens and fails CI when a text/background pair drops below threshold, so contrast is checked for the palette, not page by page.</td><td>1.4.3, 1.4.11</td><td>auto</td></tr>
+<tr><td>Information is never conveyed by colour alone (links, errors, diff additions and deletions, status badges)</td><td>1.4.1</td><td>manual</td></tr>
+<tr><td>Reflow: usable at 320 CSS pixels wide (400% zoom) without two-dimensional scrolling, except tables and code blocks, which scroll inside their own container</td><td>1.4.10</td><td>manual (automated width check on key pages)</td></tr>
+<tr><td>Text resizes to 200% and survives user text-spacing overrides without loss; sizes in <code>rem</code>, no fixed-height text containers</td><td>1.4.4, 1.4.12</td><td>manual</td></tr>
+<tr><td>Honour <code>prefers-color-scheme</code>, <code>prefers-reduced-motion</code> (no animation needed), <code>prefers-contrast</code> and forced-colors mode (borders and focus rings stay visible)</td><td>1.4.3, 2.3.3 (AAA, good practice)</td><td>manual</td></tr>
+<tr><td>Scrollable table and code containers are keyboard reachable (<code>tabindex="0"</code>, a label) so their content can be scrolled without a mouse</td><td>2.1.1</td><td>auto and manual</td></tr>
+<tr><td>Orientation is not locked; content works in portrait and landscape</td><td>1.3.4</td><td>manual</td></tr>
+</table>
+
+<h3>Forms, sign-in and errors</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Every control has a programmatically associated visible label; required fields marked in text; grouped controls use <code>fieldset</code> and <code>legend</code></td><td>1.3.1, 3.3.2, 4.1.2</td><td>auto</td></tr>
+<tr><td>Autocomplete tokens on account forms: <code>username</code>, <code>current-password</code>, <code>new-password</code>, <code>email</code>, <code>name</code></td><td>1.3.5</td><td>auto</td></tr>
+<tr><td><strong>Sign-in must not block paste or password managers</strong>, and no puzzle or memory test is required (this matches the 15-character password policy: users need a manager)</td><td>3.3.8 (new)</td><td>manual</td></tr>
+<tr><td>Show-password toggle is a real button with a state (<code>aria-pressed</code>)</td><td>4.1.2</td><td>manual</td></tr>
+<tr><td>Errors are identified in text, linked to the field with <code>aria-describedby</code>, and summarised at the top with focus moved there on submit; suggestions given when known</td><td>3.3.1, 3.3.3</td><td>manual</td></tr>
+<tr><td>Do not ask users to re-enter information they already gave in the same flow (for example email in the invitation flow)</td><td>3.3.7 (new)</td><td>manual</td></tr>
+<tr><td>Destructive or irreversible actions (delete, purge, revoke key) are reversible or confirmed</td><td>3.3.4</td><td>manual</td></tr>
+<tr><td>Session timeout: the user is warned before sign-out and an unsent edit is preserved (the draft is kept locally, <a href="auth-sessions.html">RES.5</a>)</td><td>2.2.1</td><td>manual</td></tr>
+</table>
+
+<h3>Dynamic content</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Status messages (saved, upload queued, processing finished, search results count) announced through a polite live region without moving focus</td><td>4.1.3</td><td>manual</td></tr>
+<tr><td>Search-as-you-type and the link picker use the ARIA combobox pattern correctly, or fall back to a plain results list</td><td>4.1.2, 2.1.1</td><td>manual</td></tr>
+<tr><td>Preview pane updates are not announced on every keystroke (announce on request only)</td><td>4.1.3</td><td>manual</td></tr>
+<tr><td>Client-side route changes move focus to the new <code>h1</code> and update the title, since the UI is a JavaScript client</td><td>2.4.2, 2.4.3</td><td>manual</td></tr>
+<tr><td>Public reading pages are server-rendered, so they work without JavaScript and for assistive tech that struggles with script-built pages</td><td>robustness (4.1.2)</td><td>manual</td></tr>
+</table>
+
+<h3>Rendered content authors produce</h3>
+<table><tr><th>Check</th><th>WCAG</th><th>How</th></tr>
+<tr><td>Images need alt text: the <code>media:</code> syntax requires an alt or an explicit "decorative" marker; the editor warns when alt is missing and the renderer outputs <code>alt=""</code> only for decorative images</td><td>1.1.1</td><td>auto and manual</td></tr>
+<tr><td>Data tables get a header row (<code>&lt;th scope&gt;</code>) and an optional caption; the renderer must not output tables without headers silently</td><td>1.3.1</td><td>auto</td></tr>
+<tr><td>Heading levels from Markdown are shifted so a page's content headings start below the page <code>h1</code></td><td>1.3.1</td><td>auto</td></tr>
+<tr><td>Math is output as MathML (RES.2 decides the renderer), which screen readers can read; if images are produced they carry text alternatives</td><td>1.1.1</td><td>manual</td></tr>
+<tr><td>Native <code>video</code> and <code>audio</code> with <code>controls</code>; no autoplay; captions and transcripts: see below</td><td>1.2.x, 1.4.2, 2.2.2</td><td>manual</td></tr>
+<tr><td>Language changes within content (for example fantasy names) are not required to be marked; text in another language longer than a phrase should be</td><td>3.1.2 (AA)</td><td>manual</td></tr>
+</table>
+
+<h3>Captions and transcripts for uploaded media</h3>
+<p>WCAG requires captions for prerecorded video with audio (1.2.2, level A) and a text alternative for audio-only (1.2.1, A). The site cannot make users' recordings accessible, but it can make accessibility possible: the media pipeline accepts an optional WebVTT caption file per video (and a transcript page link per audio file) and the renderer emits a <code>&lt;track kind="captions"&gt;</code>. An edit-screen reminder asks uploaders to add one. This is a <strong>new suggestion for the TODO</strong> (a MED item after MED.7); until it exists, the licence and upload pages should state that uploaded video should carry captions.</p>
+
+<h2>Testing plan</h2>
+<table><tr><th>Layer</th><th>Tool</th><th>When</th></tr>
+<tr><td>Automated rules (about a third to over half of issues, depending on who counts; the share is from memory and varies by source)</td><td>axe-core (MPL-2.0) through a Playwright run against the app loaded with sample content (TST.3), for key pages in light and dark themes and at phone and desktop widths</td><td>Daily CI job; failures open an issue (<a href="platform-conventions.html">conventions</a>)</td></tr>
+<tr><td>Palette contrast script (reads the CSS tokens)</td><td>small Python script in <code>scripts/</code></td><td>Daily CI and locally via <code>scripts/check</code></td></tr>
+<tr><td>Keyboard-only walkthrough of the main tasks: sign in, find a page, edit, preview, save, upload</td><td>a person</td><td>Each UI item; again before each release</td></tr>
+<tr><td>Screen reader pass (NVDA with Firefox or Chrome on Windows, VoiceOver on macOS or iOS, Orca on Linux)</td><td>a person</td><td>Before each release; at least one reader per release</td></tr>
+<tr><td>400% zoom, 320 px width, forced colours, reduced motion</td><td>a person with browser dev tools</td><td>Before each release</td></tr>
+</table>
+<p>Playwright and Chromium were noted as available in the research environment; the GitHub runner image availability for CI is not confirmed.</p>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>The normative wording and thresholds of the WCAG 2.2 criteria (w3.org unreachable); numbers and levels were confirmed by search results, thresholds are from memory.</li>
+<li>axe-core's licence and version (not on PyPI; checked nothing in npm), and its detection share.</li>
+<li>Legal applicability to this project.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>UI.13 (this checklist is its content), OPS.4 (testing plan above), UI.12 (contrast script for the theme tokens), RND.1/RND.3 (alt, table headers, heading shift), MED.7 (alt-required syntax), new suggestion MED.10 for captions and transcripts, AUTH.2 (paste allowed, autocomplete tokens).</p>
+
+</main></body></html>
