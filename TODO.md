@@ -200,10 +200,10 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 
 Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 
-- [ ] **UI.1** JavaScript client scaffold, served from our origin with hashed assets [0.1] — needs: FND.3, RES.11, RES.22, RES.24
+- [ ] **UI.1** JavaScript client scaffold: no-build ES modules and hand-written CSS in src/spakr/web/static, served from our origin with hashed file names (Python script, no Node) [0.1] — needs: FND.3, RES.11, RES.22, RES.24
 - [ ] **UI.2** Server-rendered public reading pages with SEO markup [0.8] — needs: UI.13, UI.14, RND.5, ENT.13
 - [ ] **UI.3** Login, invitation and account screens [0.8] — needs: UI.13, AUTH.4, AUTH.5, AUTH.10
-- [ ] **UI.4** Page editor with preview [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
+- [ ] **UI.4** Page editor with preview: textarea, small toolbar and server-rendered preview (CodeMirror only after 1.0, needs a CSP nonce) [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
 - [ ] **UI.5** History, diff and revert screens [0.8] — needs: UI.2, UI.13, GIT.4
 - [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, UI.13, SEARCH.5, LNK.4
 - [ ] **UI.7** Admin screens: allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
@@ -216,6 +216,9 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.14** Responsive, themed tables, code blocks and HTML5 media players in rendered pages [0.3] — needs: UI.12, RND.1
 - [ ] **UI.15** Large-screen (TV) and foldable layouts: scaled type and spacing, visible focus and remote or keyboard navigation, safe areas, fold-aware spacing [0.1] — needs: UI.11, UI.12, RES.23
 - [ ] **UI.16** Device test matrix and screenshot checks at phone, foldable, tablet, desktop and TV widths in light and dark [0.1] — needs: UI.13, UI.15, TST.1
+- [ ] **UI.17** Asset tooling in Python: scripts/hash-assets, make-icons and check-contrast, THIRD-PARTY.md for vendored files, and per-page size budgets checked in the daily run [0.1] — needs: UI.1, FND.7
+- [ ] **UI.18** Web app manifest and icons so the site can be installed; no service worker in 1.0 [0.8] — needs: UI.2
+- [ ] **UI.19** Search-as-you-type combobox and the editor link picker (progressive ARIA combobox over the autocomplete endpoint) [0.8] — needs: UI.6, SEARCH.7
 
 ## OPS: Hardening and operations
 
@@ -243,7 +246,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.8** SEO libraries and markup: sitemap writer, canonical URLs, meta and structured data [0.0]
 - [x] **RES.9** Upload type sniffing: python-magic or filetype, and whether to add a virus scan [0.0]
 - [ ] **RES.10** Media toolchain per operation: confirm the efficient choice (ImageMagick or Pillow for images; ffmpeg for all audio and video). ffmpeg and ImageMagick are preferred; Python libraries allowed where measurably better (builds on docs/research/media-processing.html) [0.0]
-- [ ] **RES.11** Front-end approach: plain JavaScript modules or a small library, build and asset-hashing tooling, CSP-compatible [0.0]
+- [x] **RES.11** Front-end approach: plain JavaScript modules or a small library, build and asset-hashing tooling, CSP-compatible [0.0]
 - [x] **RES.12** Rate limiting: Flask-Limiter or own Redis counters [0.0]
 - [ ] **RES.13** Entity field definitions: choose the structured fields and front matter schema for each entity type [0.0]
 - [x] **RES.14** OpenAPI generation: apispec/flask-smorest or hand-written description [0.0]
@@ -253,10 +256,10 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
 - [ ] **RES.19** Import and export formats [0.0]
 - [x] **RES.20** Settings and secrets implementation details: file locking, mode 0600, atomic rewrite of config.json and reload across workers (approach decided: the app rewrites config.json, secret fields write-only) [0.0]
-- [ ] **RES.21** CSS approach and design system: modern CSS (custom properties, container queries, grid, clamp, light-dark, logical properties) with no framework versus a small utility or component library; self-hosted fonts and inline SVG icons; no CSS-in-JS [0.0]
-- [ ] **RES.22** Is Node.js justified? Build-time-only tooling (esbuild or Vite versus none) for bundling, asset hashing and CSS processing; runtime stays Python; effect on install, CI and the CSP [0.0]
-- [ ] **RES.23** Device range from small phone and foldable to tablet, desktop and big-screen TV: breakpoints and fluid type, foldable viewport segments, 10-foot layout and remote or keyboard focus navigation, safe areas, test matrix [0.0]
-- [ ] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
+- [x] **RES.21** CSS approach and design system: modern CSS (custom properties, container queries, grid, clamp, light-dark, logical properties) with no framework versus a small utility or component library; self-hosted fonts and inline SVG icons; no CSS-in-JS [0.0]
+- [x] **RES.22** Is Node.js justified? Build-time-only tooling (esbuild or Vite versus none) for bundling, asset hashing and CSS processing; runtime stays Python; effect on install, CI and the CSP [0.0]
+- [x] **RES.23** Device range from small phone and foldable to tablet, desktop and big-screen TV: breakpoints and fluid type, foldable viewport segments, 10-foot layout and remote or keyboard focus navigation, safe areas, test matrix [0.0]
+- [x] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
 
 ## TST: Testing and sample content
 

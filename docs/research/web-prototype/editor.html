@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Edit Saltmarch Coast - spakr prototype</title>
+<link rel="stylesheet" href="static/app.css">
+<script type="module" src="static/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <a class="brand" href="index.html">spakr</a>
+  <nav aria-label="Main"><ul><li><a href="index.html">Read</a></li><li><a href="editor.html" aria-current="page">Edit</a></li><li><a href="../web-layer.html">Research</a></li></ul></nav>
+  <form class="search" role="search" action="index.html"><label class="vh" for="q">Search pages</label><input id="q" name="q" type="search" placeholder="Search pages" autocomplete="off"></form>
+  <button class="btn" type="button" data-toggle-theme aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-moon"/></svg><span>Dark</span></button>
+  <button class="btn" type="button" data-toggle-tv aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-tv"/></svg><span>TV</span></button>
+</header>
+<main id="main" class="page">
+<h1>Edit: Saltmarch Coast</h1>
+<form action="editor.html" method="post">
+<div class="editor">
+<div>
+  <div class="tabs" role="tablist" aria-label="Editor views">
+    <button role="tab" id="tab-write" aria-controls="pane-write" aria-selected="true" type="button">Write</button>
+    <button role="tab" id="tab-prev" aria-controls="pane-prev" aria-selected="false" tabindex="-1" type="button">Preview</button>
+  </div>
+  <div class="pane" id="pane-write" role="tabpanel" aria-labelledby="tab-write">
+    <div class="toolbar" role="toolbar" aria-label="Formatting">
+      <button class="btn" type="button" aria-label="Bold"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-bold"/></svg></button>
+      <button class="btn" type="button" aria-label="Italic"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-italic"/></svg></button>
+      <button class="btn" type="button" aria-label="Heading"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-heading"/></svg></button>
+      <button class="btn" type="button" aria-label="Link to page"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-link"/></svg></button>
+      <button class="btn" type="button" aria-label="Insert media"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-image"/></svg></button>
+    </div>
+    <label for="body">Page text (Markdown and LaTeX)</label>
+    <textarea id="body" name="body" spellcheck="true">The **Saltmarch** is a long, fog-bound coast.
+
+## Tides and travel
+
+Crossing time: $t = \frac{d}{v - v_c}$</textarea>
+    <p class="hint">Preview is rendered by the server so it always matches the published page.</p>
+  </div>
+</div>
+<div class="pane" id="pane-prev" role="tabpanel" aria-labelledby="tab-prev" hidden>
+  <div class="card prose"><h2>Preview</h2><p>The <strong>Saltmarch</strong> is a long, fog-bound coast.</p></div>
+</div>
+</div>
+<label for="summary">Summary of this change</label>
+<input id="summary" name="summary" type="text" autocomplete="off">
+<div class="actions"><button class="btn btn-primary" type="submit"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-save"/></svg>Save page</button><a class="btn" href="index.html">Cancel</a></div>
+</form>
+</main>
+<footer class="site-foot"><p>Code MIT. Content CC BY-SA 4.0. Prototype page for the web-layer research (RES.11); no real data.</p></footer>
+</body>
+</html>

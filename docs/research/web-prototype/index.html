@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Saltmarch Coast - spakr prototype</title>
+<link rel="stylesheet" href="static/app.css">
+<script type="module" src="static/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <a class="brand" href="index.html">spakr</a>
+  <nav aria-label="Main"><ul><li><a href="index.html" aria-current="page">Read</a></li><li><a href="editor.html">Edit</a></li><li><a href="../web-layer.html">Research</a></li></ul></nav>
+  <form class="search" role="search" action="index.html"><label class="vh" for="q">Search pages</label><input id="q" name="q" type="search" placeholder="Search pages" autocomplete="off"></form>
+  <button class="btn" type="button" data-toggle-theme aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-moon"/></svg><span>Dark</span></button>
+  <button class="btn" type="button" data-toggle-tv aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="static/icons.svg#i-tv"/></svg><span>TV</span></button>
+</header>
+<main id="main" class="page">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="index.html">Places</a></li><li><a href="index.html">High fantasy</a></li><li aria-current="page">Saltmarch Coast</li></ol></nav>
+<div class="layout">
+<article class="prose">
+  <h1>Saltmarch Coast</h1>
+  <ul class="tags"><li class="tag">place</li><li class="tag">high fantasy</li><li class="tag">coast</li></ul>
+  <p>The <strong>Saltmarch</strong> is a long, fog-bound coast of tidal flats, drowned villages and lighthouses that nobody remembers lighting. Travellers cross it on the <a href="index.html">Causeway of Teeth</a> twice a day, between tides.</p>
+  <div class="notice"><p><strong>GM note.</strong> Pages marked GM-only never appear for readers; the badge here is shown by more than colour.</p></div>
+  <h2>Tides and travel</h2>
+  <p>Crossing time depends on the tide. A simple model: <math display="inline"><mi>t</mi><mo>=</mo><mfrac><mi>d</mi><mrow><mi>v</mi><mo>&#x2212;</mo><msub><mi>v</mi><mi>c</mi></msub></mrow></mfrac></math>, where <math display="inline"><mi>d</mi></math> is the distance, <math display="inline"><mi>v</mi></math> the party's speed and <math display="inline"><msub><mi>v</mi><mi>c</mi></msub></math> the current. Rendered as MathML on the server, so it needs no script and no fonts.</p>
+  <figure>
+    <button class="thumb" type="button" data-lightbox="static/img/map.svg" data-caption="Sketch map of the Saltmarch coast"><img src="static/img/map.svg" width="640" height="400" alt="Sketch map: mountains in the north-west, a green coast and a golden beacon near the centre"></button>
+    <figcaption>Sketch map of the coast. Select the picture to enlarge it.</figcaption>
+  </figure>
+  <h2>Crossing times</h2>
+  <div class="table-wrap" role="region" aria-labelledby="cap1" tabindex="0">
+  <table><caption id="cap1">Causeway crossing by tide (hours)</caption>
+  <thead><tr><th scope="col">Tide</th><th scope="col">On foot</th><th scope="col">Mounted</th><th scope="col">Cart</th><th scope="col">Danger</th></tr></thead>
+  <tbody><tr><th scope="row">Low</th><td>3</td><td>1.5</td><td>2.5</td><td>Fog</td></tr>
+  <tr><th scope="row">Rising</th><td>4</td><td>2</td><td>Not advised</td><td>Quicksand</td></tr>
+  <tr><th scope="row">High</th><td colspan="3">Closed</td><td>Drowning</td></tr></tbody></table></div>
+  <h2>For the table</h2>
+  <pre tabindex="0"><code>d6 fog roll:  1-2 lose the path  |  3-4 lose an hour  |  5-6 clear</code></pre>
+  <blockquote><p>"Count the bells, not the miles." Ferryman's proverb.</p></blockquote>
+  <h2>Lighthouse recording</h2>
+  <p><audio class="media" controls preload="none" aria-label="Ferryman's song (prototype, no source)"></audio></p>
+  <video class="media" controls preload="none" poster="static/img/map.svg" aria-label="Fog rolling in (prototype, no source)"></video>
+  <h2>Nearby</h2>
+  <ul class="grid">
+    <li class="card"><a href="index.html"><h3>Causeway of Teeth</h3><p>A tidal road lined with broken piers.</p></a></li>
+    <li class="card"><a href="index.html"><h3>Lantern Guild</h3><p>Keepers of the unlit lights.</p></a></li>
+    <li class="card"><a href="index.html"><h3>Marsh hag</h3><p>Entity, challenge 5.</p></a></li>
+    <li class="card"><a href="index.html"><h3>Tidal compass</h3><p>Item, uncommon.</p></a></li>
+  </ul>
+</article>
+<aside class="side" aria-label="Page facts">
+  <section class="card infobox"><h2>Facts</h2>
+  <dl><dt>Type</dt><dd>Place</dd><dt>Setting</dt><dd>High fantasy</dd><dt>Region</dt><dd>Western seaboard</dd><dt>Ruler</dt><dd><a href="index.html">Lantern Guild</a></dd><dt>Population</dt><dd>About 12,000</dd></dl></section>
+  <section class="card"><h2>Page history</h2><p class="hint">Revision 14 by Marta, 2 days ago.</p><p><a href="index.html">View history</a></p></section>
+</aside>
+</div>
+<dialog class="lightbox" aria-label="Enlarged picture"><img alt="" src=""><p></p><button class="btn btn-primary" type="button" data-close>Close</button></dialog>
+</main>
+<footer class="site-foot"><p>Code MIT. Content CC BY-SA 4.0. Prototype page for the web-layer research (RES.11); no real data.</p></footer>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web layer: approach, CSS, Node and components - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="web-layer.html">Web layer</a><a href="web-devices.html">Devices and TV</a><a href="web-components.html">UI components</a><a href="web-prototype/index.html">Prototype</a><a href="accessibility.html">Accessibility</a><a href="apache-hosting.html">Apache</a><a href="packaging.html">Packaging</a></nav><main>
+
+<h1>RES.11, RES.21, RES.22, RES.24: the web layer</h1>
+<p><em>Research thread C, 2026-10-17. Decides the front-end approach (RES.11), CSS and design system (RES.21), whether Node.js is justified (RES.22) and the component approach (RES.24). Companion pages: <a href="web-devices.html">devices, TV and foldables (RES.23)</a> and <a href="web-components.html">components: editor, tables, lightbox, media, icons, fonts, search, forms, PWA</a>. A working <a href="web-prototype/index.html">prototype</a> backs the numbers.</em></p>
+
+<h2>Recommendation</h2>
+<ol>
+<li><strong>No Node.js in the product.</strong> Not at runtime, not at install, not in the build. Asset tooling is three small Python scripts (hashing, icon sprite, contrast check) that were written and run for this research. Node stays optional for contributors who want it (for example to run esbuild), never required.</li>
+<li><strong>Plain modern CSS with design tokens</strong>, hand written, about 4 KB gzipped for the whole prototype. No CSS framework. Light and dark come from the same tokens, with a server-stored user choice.</li>
+<li><strong>No-build vanilla JavaScript</strong>: native ES modules and a few small custom elements, one entry module per page, progressive enhancement over server-rendered pages. About 2 KB gzipped in the prototype (theme and TV toggles, lightbox, editor tabs, remote-control navigation).</li>
+<li><strong>Reserve, do not adopt, a library:</strong> if the admin and editor screens outgrow plain modules, add <strong>Preact 11 with htm</strong> (about 5 KB gzipped, no JSX build step) for those screens only. Decide when UI.4 or UI.7 actually hurt, not before.</li>
+<li><strong>Strict CSP is the design constraint</strong> and it rules out most of the popular choices (see the table). The prototype was served with <code>default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'</code> and produced zero violations in 36 page loads.</li>
+</ol>
+
+<h2>What was built and tested</h2>
+<p>Pages: a reading page (title, tags, notice, MathML, figure with lightbox, scrolling table, code, audio and video, card grid, facts sidebar) and an editor page (Write and Preview tabs that become side by side on wide screens, toolbar, form). They are in <a href="web-prototype/index.html"><code>docs/research/web-prototype/</code></a> and can be opened straight from the repository.</p>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Viewports (Chromium 141 through Playwright)</td><td>small phone 320x568, phone 390x844, foldable cover 280x653, foldable open 884x1104, tablet 820x1180, laptop 1366x768, desktop 1920x1080, TV mode 1920x1080 and TV mode 3840x2160 (raw pixels); each in light and dark, on both pages: 36 loads</td></tr>
+<tr><td>Horizontal page overflow</td><td>none in all 36 (tables and code scroll inside their own box)</td></tr>
+<tr><td>axe-core 4.14.0 (WCAG 2.0, 2.1 and 2.2 A and AA plus best practice)</td><td>zero violations in all 36. Sanity check: the same run reports button-name, image-alt and landmark problems on a deliberately bad page, so it does detect things. axe's colour-contrast rule does not decide on every element, so the palette is also checked by <code>tools/contrast.py</code> (below).</td></tr>
+<tr><td>Palette contrast (<code>tools/contrast.py</code>)</td><td>16 pairs per theme against WCAG 1.4.3 and 1.4.11 thresholds; it caught one failing pair (notice border, 2.99:1) which was fixed; it also fails if the media-query dark palette and the <code>[data-theme=dark]</code> palette ever drift apart</td></tr>
+<tr><td>Strict CSP</td><td>zero violations. No <code>style=""</code> attributes anywhere.</td></tr>
+<tr><td>Smallest touch target</td><td>44 CSS px on phones and desktops, 55 to 77 in TV mode</td></tr>
+<tr><td>Behaviour</td><td>theme toggle, lightbox on native <code>&lt;dialog&gt;</code>, hashed assets (below) and arrow-key focus movement in TV mode were exercised by script</td></tr>
+</table>
+<p>Screenshots (light and dark, phone to 4K): <a href="web-prototype/shots/phone-dark.png">phone dark</a>, <a href="web-prototype/shots/fold-open-light.png">foldable open</a>, <a href="web-prototype/shots/tablet-light.png">tablet</a>, <a href="web-prototype/shots/desktop-dark.png">desktop dark</a>, <a href="web-prototype/shots/tv-1080-light.png">TV 1080p</a>, <a href="web-prototype/shots/tv-4k-raw-light.png">TV 4K raw</a>.</p>
+<p><strong>Not tested:</strong> real devices, Safari and Firefox, older TV engines (Chromium before 109 is not installed here), a screen reader, and anything over a real network. Viewport sizes are representative, not measured from the devices.</p>
+
+<h2>RES.22: is Node.js justified?</h2>
+<p><strong>No.</strong> What Node would buy us here is bundling, minifying and hashing, and none is needed:</p>
+<table>
+<tr><th>Job</th><th>Without Node</th><th>Evidence</th></tr>
+<tr><td>Bundling</td><td>Not needed. Native ES modules, a handful of small files, HTTP/2 from Apache. Modules are shipped as written.</td><td>The prototype's JS is 5 KB across three files.</td></tr>
+<tr><td>Minifying</td><td>Not needed at this size. Apache <code>mod_deflate</code> (or brotli) does the work.</td><td>CSS: 4.1 KB gzipped as written versus 3.2 KB minified; JS: 2.0 versus 1.2 KB (esbuild 0.28.2, measured). Under 1 KB saved per page load; revisit above about 50 KB of JS.</td></tr>
+<tr><td>Asset hashing for immutable caching</td><td><code>tools/hash-assets.py</code> (about 40 lines, stdlib only): renames each file to <code>name.&lt;sha256-10&gt;.ext</code>, rewrites relative <code>import</code> specifiers, writes <code>manifest.json</code> for the Jinja templates. Limits: no import cycles; imports must be static relative paths (no import maps, which need an inline script or a nonce).</td><td>Run on the prototype: 6 files hashed, modules loaded from the hashed copies under the strict CSP with no errors.</td></tr>
+<tr><td>Icon sprite</td><td><code>tools/make-icons.py</code>: 19 Lucide icons copied into one SVG sprite, 3.8 KB (1.1 KB gzipped).</td><td>Measured.</td></tr>
+<tr><td>CSS processing (prefixes, nesting, imports)</td><td>None needed: modern CSS shipped as written; no preprocessor.</td><td>Browser targets below.</td></tr>
+<tr><td>Test tooling</td><td>Python <code>playwright</code> (pip, Apache-2.0; version 1.64.0 downloaded here) and a vendored copy of axe-core's single file <code>axe.min.js</code> (MPL-2.0, 4.14.0) injected into the page; <code>axe-playwright-python</code> 0.1.8 exists as a wrapper. The same checks used in this research.</td><td>pip download worked; the CI runner side is not tested.</td></tr>
+</table>
+<h3>Cost of adding Node anyway</h3>
+<ul>
+<li><strong>Ubuntu 24.04 does not ship a usable Node.</strong> Current build tools demand a recent Node: Vite 8.3.4 requires <code>^20.19.0 || &gt;=22.12.0</code> and Tailwind 4.3.3 the same (npm registry). The Ubuntu 24.04 archive package is, from memory, Node 18, which is end of life; I could not confirm the current figure (packages.ubuntu.com returned 503). So Node would need a third-party repository (NodeSource), nvm or a container: a new apt source, a new thing to patch, on a box whose whole job is Apache plus Python.</li>
+<li>Node 24 is the active LTS line until April 2028, Node 22 reaches end of life in April 2027 and Node 26 becomes LTS in October 2026 (from endoflife.date and Node release pages as returned by search; not fetched directly). A build chain pinned to Node means a forced upgrade inside 1.0's support window.</li>
+<li><strong>Supply chain:</strong> a typical Vite or Tailwind install pulls hundreds of transitive packages (not counted here), each a chance for a malicious release, in the CI that also holds repository credentials. Our Python side is already a hashed lock file (<a href="packaging.html">RES.15</a>); the front end can stay as small.</li>
+<li>Admins installing from source would need Node and <code>npm install</code> to get a working site. With no build step, the repository's <code>static/</code> directory is the deliverable.</li>
+</ul>
+<h3>When to revisit</h3>
+<p>Adopt a Node build step (esbuild alone, a static binary, as a dev-time option) only if one of these becomes true: the editor moves to CodeMirror (needs bundling: about 175 KB gzipped for a minimal Markdown editor, measured), JS on reading pages exceeds 50 KB, or we adopt a framework with JSX or single-file components. Even then the built output is committed or built in CI, so installing the site still needs no Node.</p>
+
+<h2>RES.24 and RES.11: JavaScript and components, ranked</h2>
+<p>Sizes are gzipped, measured by bundling a hello-world with esbuild (the library code itself, not an app).</p>
+<table>
+<tr><th>#</th><th>Option</th><th>Size</th><th>Licence, version, last npm publish</th><th>CSP and fit</th></tr>
+<tr><td><strong>1</strong></td><td><strong>Vanilla ES modules + a few custom elements (chosen)</strong></td><td>2 KB (prototype)</td><td>none</td><td>Works under <code>script-src 'self'</code>. Reading pages already server-rendered; JS only enhances. No build, no framework to patch. Cost: we write small helpers (fetch wrapper, error rendering, combobox) ourselves.</td></tr>
+<tr><td><strong>2</strong></td><td>Preact 11 + htm (reserve)</td><td>Preact 4.6 KB; htm 0.7 KB</td><td>MIT; 11.0.1 (2026-10-08); htm MIT</td><td>No eval, no inline script. htm tagged templates run in the browser with no JSX compile. Gives components and state for the editor and admin screens if plain modules get tangled. Check: htm builds templates by parsing strings at runtime and is cached; I did not test it under the CSP.</td></tr>
+<tr><td>3</td><td>Lit 3 (web components)</td><td>5.8 KB</td><td>BSD-3-Clause; 3.3.3 (2026-05-14)</td><td>Fine under the CSP (adopted stylesheets, tested in principle by our own adoptedStyleSheets check). Shadow DOM is the cost: form controls inside it do not take part in the outer form, labels and password managers can break, and page CSS does not reach in. Poor fit for forms; reasonable for self-contained widgets only.</td></tr>
+<tr><td>4</td><td>htmx 2</td><td>16.8 KB</td><td>0BSD; 2.0.11 (2026-09-22)</td><td>Designed for server HTML fragments; our rule is a JSON API consumed by first-party JS, so we would need a second set of fragment endpoints. <code>hx-on</code> and event filters use <code>new Function</code> and need <code>unsafe-eval</code>; htmx documents this and an <code>hx-csp</code> extension that is part of htmx 4, still labelled under construction. Rejected.</td></tr>
+<tr><td>5</td><td>Alpine.js 3</td><td>19.9 KB (CSP build is separate)</td><td>MIT; 3.17.4 (2026-09-21)</td><td>The normal build evaluates attribute expressions with <code>Function</code> and needs <code>unsafe-eval</code>. The CSP build avoids it but limits expressions to property reads and method calls and requires <code>Alpine.data</code> components, which makes it plain JS with extra steps. Rejected.</td></tr>
+<tr><td>6</td><td>Vue 3 / Svelte 5 / SolidJS / React</td><td>not measured</td><td>MIT (versions: Vue 3.5.44, Svelte 5.57.2, Solid 1.9.17)</td><td>Need a build step (SFC or JSX compilation) for ergonomic use, and want to own the page, which duplicates the server-rendered reading pages. Rejected unless the front end becomes a true single-page app, which the requirements argue against.</td></tr>
+<tr><td>7</td><td>Turbo, Unpoly, Stimulus</td><td>Turbo 8.0.23 and Unpoly 3.14.3 not measured</td><td>MIT</td><td>HTML-over-the-wire frameworks, same mismatch as htmx. Stimulus 3.2.2 was last published in 2023. Rejected.</td></tr>
+</table>
+<h3>Structure that follows</h3>
+<ul>
+<li><strong>Real pages, no client router.</strong> Every screen is a server-rendered URL; the browser handles navigation, back, history and focus. This also satisfies the accessibility rule about moving focus on route changes (<a href="accessibility.html">RES.18</a>) because there is no client routing. Optional later: <code>@view-transition</code> in CSS for smooth navigation (Chromium-only, harmless elsewhere; support not verified here).</li>
+<li><strong>One entry module per page</strong>, loaded as <code>&lt;script type="module" src="..."&gt;</code> from the hashed manifest. Heavy modules (a future CodeMirror) are loaded with dynamic <code>import()</code> only on the editor page.</li>
+<li><strong>API client</strong>: one 40-line module wrapping <code>fetch</code>: same-origin, session cookie, the CSRF token header, the API error format mapped to field errors. No client-side validation library: HTML5 attributes give instant hints, the server (pydantic) is the authority.</li>
+<li><strong>State</strong>: per screen, in the DOM and a few module variables. Drafts of unsent edits go to <code>localStorage</code> (the accessibility page already requires this).</li>
+<li><strong>Without JavaScript</strong>: reading, browsing, search results, history and the facts sidebar all work. Editing, uploads and admin screens require JavaScript (they call the JSON API). Sign-in would need an extra form-encoded path on the API to work without JavaScript; I propose not supporting that in 1.0 (open question, below).</li>
+</ul>
+
+<h2>RES.21: CSS approach, ranked</h2>
+<table>
+<tr><th>#</th><th>Option</th><th>Size (gzipped)</th><th>Licence, version, last publish</th><th>Assessment</th></tr>
+<tr><td><strong>1</strong></td><td><strong>Hand-written modern CSS with tokens (chosen)</strong></td><td>4.1 KB for the prototype (3.2 KB minified)</td><td>ours (MIT)</td><td>Custom properties, grid, flex, <code>clamp()</code> fluid type, logical properties, container queries as enhancement, media features for dark, contrast, motion, forced colours, print and pointer. Fits the CSP (a plain file). Cost: we maintain a design system, but the whole thing is about 330 lines.</td></tr>
+<tr><td>2</td><td>Open Props (tokens only) as a source of ideas</td><td>7.7 KB all props</td><td>MIT; 1.7.23 (2026-01-31)</td><td>Only variables; we already have ours. Useful as a reference for scales (shadows, easings), not worth a dependency.</td></tr>
+<tr><td>3</td><td>Pico CSS 2 (classless)</td><td>11.6 KB</td><td>MIT; 2.1.1 (2025-03-15)</td><td>Looks decent with no classes, and has dark mode. Has not been published for 19 months at the date of this research, and its look is hard to bend to a rules-wiki with infoboxes. A reasonable fallback if we wanted a head start.</td></tr>
+<tr><td>4</td><td>Tailwind CSS 4</td><td>output depends on use</td><td>MIT; 4.3.3 (2026-10-16)</td><td>Needs its compiler (Node packages; a standalone binary exists, from my knowledge, not verified here). Utility classes in every template and none in Markdown-rendered content, so a separate prose stylesheet is still required. Rejected for the build cost and for hiding the CSP constraint behind a toolchain.</td></tr>
+<tr><td>5</td><td>Bootstrap 5.3</td><td>CSS 30.8 KB + JS 23.7 KB</td><td>MIT; 5.3.8 (2026-10-08)</td><td>Mature and accessible, dark mode through <code>data-bs-theme</code>. Large for what we use; its JS components (modal, dropdown, tooltip) set inline styles from script, which I did not test against our CSP (CSSOM styles pass, see below, but its Popper positioning is unverified). Generic look. Rejected.</td></tr>
+<tr><td>6</td><td>Web Awesome 3 / Shoelace 2 (web components)</td><td>17.5 MB and 8.4 MB unpacked</td><td>MIT; 3.14.0 and 2.20.1</td><td>Components render only with JavaScript, which breaks the server-rendered-reading rule and indexing of content inside them. Rejected for reading pages.</td></tr>
+</table>
+<h3>CSS rules adopted (from what failed or passed in the prototype)</h3>
+<ul>
+<li><strong>Theme tokens as custom properties.</strong> Light is the default; dark is applied by <code>prefers-color-scheme</code> unless the user chose light, and by <code>[data-theme=dark]</code> when the user chose dark. The server renders the attribute from the account setting or a cookie, so there is no flash and no inline script (UI.12). I did not use <code>light-dark()</code>: it is newer (Chrome 123, from memory) and TV engines are older. The price is that the dark palette appears twice; <code>tools/contrast.py</code> fails the build when the two copies differ.</li>
+<li><strong>No <code>@layer</code>, no CSS nesting, no <code>light-dark()</code>.</strong> A browser that does not understand <code>@layer</code> drops the whole block, which on an older TV engine means an unstyled site. Container queries are used only as a progressive enhancement (the infobox) with a working single-column fallback.</li>
+<li><strong>Browser support policy:</strong> features must be Baseline <em>widely available</em> (web.dev: the 30-month rule) or have a safe fallback. Checked by search: <code>:has()</code> was newly available in December 2023, container size queries in February 2023 and CSS nesting in August 2023 (web.dev reported <code>:has()</code> as widely available from June 2026). The other 30-month dates are my own arithmetic; confirm on web.dev/baseline before relying on a specific feature. I could not confirm a Baseline status for <code>light-dark()</code>, popover or <code>dialog</code> from search.</li>
+<li><strong>Under the strict CSP</strong> I tested in Chromium 141: <code>el.style.color = ...</code>, <code>el.style.setProperty('--w', ...)</code> and <code>adoptedStyleSheets</code> all work; <code>setAttribute('style', ...)</code> and <code>innerHTML</code> containing a <code>style</code> attribute are blocked (2 violations logged). Consequences: dynamic sizing goes through custom properties set from JS; the HTML sanitiser (RND.3) must strip <code>style</code> attributes, which it should anyway; templates carry no inline style.</li>
+<li><strong>Sizes in <code>rem</code>, spacing in logical properties, fluid type with <code>clamp()</code></strong>. TV mode simply raises the root font size, so every size follows.</li>
+</ul>
+
+<h2>CSP and supply chain, per candidate</h2>
+<table>
+<tr><th>Candidate</th><th>Under <code>script-src 'self'; style-src 'self'</code></th></tr>
+<tr><td>Own modules, Preact, htm, Lit</td><td>Pass (own modules and the adopted-stylesheet path tested; Preact and Lit not run under the CSP here).</td></tr>
+<tr><td>htmx, Alpine</td><td>Pass only without their eval features (see above).</td></tr>
+<tr><td>CodeMirror 6</td><td><strong>Fails as shipped, tested:</strong> it injects a <code>&lt;style&gt;</code> element and Chromium refuses it ("Refused to apply inline style" under <code>style-src 'self'</code>). CodeMirror has a nonce option (<code>EditorView.cspNonce</code>), which needs a per-request nonce in the CSP header's <code>style-src</code>; that is workable (a nonce on styles is a much smaller hole than <code>unsafe-inline</code>) but it is a policy change and an argument for the plain textarea in 1.0.</td></tr>
+<tr><td>Fonts, icons, images</td><td>Self-hosted only; no third-party CDN anywhere (also a privacy point: no visitor IP goes to Google Fonts or a CDN).</td></tr>
+</table>
+<p><strong>Supply-chain rules to adopt:</strong> every third-party file is copied into <code>static/vendor/</code> with its exact version, SHA-256 and licence recorded in a <code>THIRD-PARTY.md</code> file (ISC and MIT licences require keeping the notice); no package is loaded from a CDN; updates are deliberate commits. With a no-build front end this list will be short: icons (Lucide, ISC), optionally a font (OFL-1.1) and, later, one editor or player.</p>
+
+<h2>Performance budgets</h2>
+<p>Proposed and enforced by a small Playwright check in the daily CI run (it measures transferred sizes and fails on a breach), with the Core Web Vitals "good" thresholds as targets for a mid-range phone on a slow connection (LCP at most 2.5 s, INP at most 200 ms, CLS at most 0.1; thresholds from Google's published guidance as I know it, not re-fetched).</p>
+<table>
+<tr><th>Item</th><th>Budget (gzipped)</th><th>Prototype now</th></tr>
+<tr><td>CSS, all pages</td><td>20 KB</td><td>4.1 KB</td></tr>
+<tr><td>JS on reading pages</td><td>15 KB</td><td>2.0 KB</td></tr>
+<tr><td>JS on edit page (textarea route)</td><td>30 KB</td><td>about 2 KB plus our toolbar code</td></tr>
+<tr><td>Icon sprite</td><td>6 KB</td><td>1.1 KB</td></tr>
+<tr><td>Rendered page HTML (text, excluding media)</td><td>50 KB</td><td>small</td></tr>
+<tr><td>Layout shift</td><td>Renderer must emit <code>width</code> and <code>height</code> on images and an aspect ratio on video, so media never shifts the page (feeds MED.7 and UI.14).</td><td>done in prototype</td></tr>
+</table>
+<p>Caching: hashed assets get <code>Cache-Control: public, max-age=31536000, immutable</code>; HTML gets <code>no-cache</code> plus ETags, and pages for signed-in users add <code>private</code>. Compression by Apache <code>mod_deflate</code>; brotli (<code>mod_brotli</code>) is available on Ubuntu 24.04's Apache but I did not test it.</p>
+
+<h2>Effects on TODO items</h2>
+<table>
+<tr><th>Item</th><th>Change</th></tr>
+<tr><td>RES.11, RES.21, RES.22, RES.24</td><td>Done by this research.</td></tr>
+<tr><td>UI.1</td><td>Scaffold is: <code>src/spakr/web/static/</code> (CSS, modules, icons) and Jinja templates; <code>tools/hash-assets.py</code> becomes <code>scripts/hash-assets</code> and writes the manifest the templates read. No Node.</td></tr>
+<tr><td>UI.11, UI.12, UI.13</td><td>Prototype CSS is the starting point; <code>contrast.py</code> becomes <code>scripts/check-contrast</code> in the daily CI. UI.13's checklist gains the device matrix from the devices page.</td></tr>
+<tr><td>RND.4</td><td>CSP text above is the starting policy; RND.3 must strip <code>style</code> attributes; CodeMirror, if adopted, needs a nonce.</td></tr>
+<tr><td>New items</td><td>UI.17 asset tooling in Python and size budgets; UI.18 web app manifest; UI.19 search combobox and link picker. TV mode and the device matrix already exist as UI.15 and UI.16.</td></tr>
+</table>
+
+<h2>Decisions for the owner</h2>
+<ol>
+<li><strong>Node.js:</strong> (A, recommended) none anywhere in the product; (B) build-time only, adopted when the editor moves to CodeMirror. Recommendation A: the numbers above show no saving worth a new apt source and a large dependency tree.</li>
+<li><strong>Editor in 1.0:</strong> (A, recommended) plain textarea with a small toolbar and server-rendered preview; (B) CodeMirror 6 with syntax colouring, about 175 KB gzipped and a CSP nonce. See the components page.</li>
+<li><strong>Sign-in without JavaScript:</strong> (A, recommended) not supported in 1.0; (B) add a form-encoded login path to the API.</li>
+</ol>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>MDN and packages.ubuntu.com were unreachable (DNS failure and HTTP 503), so browser-support versions in this page set come from web.dev search results, the Samsung and LG developer pages as search summarised them, and my own knowledge where marked "from memory".</li>
+<li>The WCAG 2.2 criteria themselves were covered in <a href="accessibility.html">RES.18</a>; not repeated here.</li>
+<li>Exact current Ubuntu 24.04 <code>nodejs</code> package version; Tailwind's standalone binary; Bootstrap JS under the CSP; htm and Preact under the CSP; Safari and Firefox rendering.</li>
+</ul>
+
+</main></body></html>
