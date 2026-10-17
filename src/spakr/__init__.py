@@ -2,7 +2,7 @@
 
 import sys
 
-if sys.version_info < (3, 12):  # pragma: no cover
+if sys.version_info < (3, 12):  # noqa: UP036  (the start-up check for older Pythons)
     raise RuntimeError(
         f"spakr needs Python 3.12 or newer; this is Python {sys.version.split()[0]}."
     )
