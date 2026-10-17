@@ -121,3 +121,18 @@ def test_cli_version():
     )
     assert result.returncode == 0
     assert result.stdout.strip().count(".") == 2
+
+
+def test_config_is_searched_in_app_root_never_under_data(data_dir, monkeypatch, tmp_path):
+    from spakr.config import find_config_path
+    from spakr.paths import app_root
+
+    monkeypatch.delenv("SPAKR_CONFIG", raising=False)
+    monkeypatch.chdir(tmp_path)
+    data_dir.mkdir()
+    (data_dir / "config.json").write_text("{}")
+    with pytest.raises(ConfigError) as info:
+        find_config_path()
+    message = str(info.value)
+    assert str(app_root() / "config.json") in message
+    assert str(data_dir) not in message

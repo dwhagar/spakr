@@ -1,6 +1,8 @@
 """Load and validate config.json.
 
-Search order: explicit path, $SPAKR_CONFIG, ./config.json, /etc/spakr/config.json, <data dir>/config.json.
+Search order: explicit path; $SPAKR_CONFIG (when set it is the only candidate);
+otherwise ./config.json, config.json in the application root, /etc/spakr/config.json.
+The configuration never lives under the data directory.
 Keys starting with an underscore are comments and are ignored. Error messages
 name keys and rules, never values.
 """
@@ -10,7 +12,7 @@ import os
 import stat
 from pathlib import Path
 
-from spakr.paths import DEFAULT_DATA_DIR, data_dir
+from spakr.paths import DEFAULT_DATA_DIR, app_root
 from spakr.config.secret import Secret
 from spakr.config.settings import (
     DatabaseSettings,
@@ -53,11 +55,10 @@ def find_config_path(path=None) -> Path:
     """Return the config file to use, or raise ConfigError listing where we looked."""
     if path is not None:
         candidates = [Path(path)]
+    elif os.environ.get(ENV_CONFIG):
+        candidates = [Path(os.environ[ENV_CONFIG])]
     else:
-        candidates = []
-        if os.environ.get(ENV_CONFIG):
-            candidates.append(Path(os.environ[ENV_CONFIG]))
-        candidates += [Path("config.json"), SYSTEM_CONFIG, data_dir() / "config.json"]
+        candidates = [Path("config.json"), app_root() / "config.json", SYSTEM_CONFIG]
     for candidate in candidates:
         if candidate.is_file():
             return candidate

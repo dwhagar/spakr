@@ -9,7 +9,7 @@ from spakr.version import software_version
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="spakr")
-    parser.add_argument("--config", help="path to config.json (default: $SPAKR_CONFIG, ./config.json, /etc/spakr/config.json, <data dir>/config.json)")
+    parser.add_argument("--config", help="path to config.json (default: $SPAKR_CONFIG, ./config.json, the application root, /etc/spakr/config.json)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("version", help="print the software version")
     sub.add_parser("check-config", help="validate config.json and exit")
