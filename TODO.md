@@ -195,7 +195,7 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 
 Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 
-- [ ] **UI.1** JavaScript client scaffold, served from our origin with hashed assets [0.1] — needs: FND.3, RES.11
+- [ ] **UI.1** JavaScript client scaffold, served from our origin with hashed assets [0.1] — needs: FND.3, RES.11, RES.22, RES.24
 - [ ] **UI.2** Server-rendered public reading pages with SEO markup [0.8] — needs: UI.13, UI.14, RND.5, ENT.13
 - [ ] **UI.3** Login, invitation and account screens [0.8] — needs: UI.13, AUTH.4, AUTH.5, AUTH.10
 - [ ] **UI.4** Page editor with preview [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
@@ -205,10 +205,12 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, UI.13, MED.7
 - [ ] **UI.9** Licence statement in the footer and on edit/upload pages [0.8] — needs: UI.2, UI.13
 - [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, UI.13, LNK.7
-- [ ] **UI.11** Responsive layout base: mobile-first CSS, fluid grid and navigation, readable at phone width, no horizontal page scroll (standing requirement from the first screen) [0.1] — needs: UI.1
-- [ ] **UI.12** Theme tokens: light and dark palettes as CSS variables following prefers-color-scheme, plus a user toggle stored server-side so it works without inline script [0.1] — needs: UI.11
-- [ ] **UI.13** UI acceptance checklist applied to every UI item: responsive at phone, tablet and desktop widths, correct in light and dark, keyboard usable [0.1] — needs: UI.11, UI.12
+- [ ] **UI.11** Responsive layout base: mobile-first CSS, fluid grid and navigation, readable at phone width, no horizontal page scroll (standing requirement from the first screen) [0.1] — needs: UI.1, RES.21, RES.23
+- [ ] **UI.12** Theme tokens: light and dark palettes as CSS variables following prefers-color-scheme, plus a user toggle stored server-side so it works without inline script [0.1] — needs: UI.11, RES.21
+- [ ] **UI.13** UI acceptance checklist applied to every UI item: responsive from small phone and foldable through tablet and desktop to big-screen TV, correct in light and dark, keyboard and remote usable [0.1] — needs: UI.11, UI.12, RES.23
 - [ ] **UI.14** Responsive, themed tables, code blocks and HTML5 media players in rendered pages [0.3] — needs: UI.12, RND.1
+- [ ] **UI.15** Large-screen (TV) and foldable layouts: scaled type and spacing, visible focus and remote or keyboard navigation, safe areas, fold-aware spacing [0.1] — needs: UI.11, UI.12, RES.23
+- [ ] **UI.16** Device test matrix and screenshot checks at phone, foldable, tablet, desktop and TV widths in light and dark [0.1] — needs: UI.13, UI.15, TST.1
 
 ## OPS: Hardening and operations
 
@@ -246,6 +248,10 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
 - [ ] **RES.19** Import and export formats [0.0]
 - [x] **RES.20** Settings and secrets implementation details: file locking, mode 0600, atomic rewrite of config.json and reload across workers (approach decided: the app rewrites config.json, secret fields write-only) [0.0]
+- [ ] **RES.21** CSS approach and design system: modern CSS (custom properties, container queries, grid, clamp, light-dark, logical properties) with no framework versus a small utility or component library; self-hosted fonts and inline SVG icons; no CSS-in-JS [0.0]
+- [ ] **RES.22** Is Node.js justified? Build-time-only tooling (esbuild or Vite versus none) for bundling, asset hashing and CSS processing; runtime stays Python; effect on install, CI and the CSP [0.0]
+- [ ] **RES.23** Device range from small phone and foldable to tablet, desktop and big-screen TV: breakpoints and fluid type, foldable viewport segments, 10-foot layout and remote or keyboard focus navigation, safe areas, test matrix [0.0]
+- [ ] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
 
 ## TST: Testing and sample content
 
