@@ -34,11 +34,13 @@
 <h2>Processing rules per upload class</h2>
 <table><tr><th>Class</th><th>Pipeline</th></tr>
 <tr><td>Images (PNG, JPEG, GIF, WebP)</td><td>Sniff, Pillow decode check and pixel limit, ImageMagick re-encode with metadata stripped (<code>-strip</code>, auto-orient), make thumbnails. The re-encoded copy is what gets served.</td></tr>
-<tr><td>Video (default allowed: MP4, WebM, MOV input)</td><td><code>ffprobe</code> check (streams, duration and size limits, no external references), ffmpeg transcode to H.264/AAC MP4 and optionally VP9/Opus WebM, metadata stripped, poster frame extracted. Limit protocols with <code>-protocol_whitelist file</code>. Original discarded or kept in quarantine by setting.</td></tr>
-<tr><td>Audio</td><td>Off by default; if enabled, same ffprobe/ffmpeg path.</td></tr>
+<tr><td>Video (on by default: MP4, WebM, MOV input)</td><td><code>ffprobe</code> check (streams, duration and size limits, no external references), ffmpeg transcode to H.264/AAC MP4 and optionally VP9/Opus WebM, metadata stripped, poster frame extracted (embedded cover image from the metadata if present, otherwise a frame from the video, for example <code>ffmpeg -ss</code> a second in with <code>-frames:v 1</code>). Limit protocols with <code>-protocol_whitelist file</code>. Original discarded or kept in quarantine by setting.</td></tr>
+<tr><td>Audio (on by default)</td><td>Same ffprobe/ffmpeg path as video: probe, check duration and size, transcode to AAC in MP4/M4A and optionally Opus in Ogg/WebM, strip tags except title and artist, extract embedded cover art as an image and re-encode it through the image pipeline.</td></tr>
 <tr><td>SVG</td><td>Off by default (can carry script). If enabled, rasterise to PNG rather than serving the SVG.</td></tr>
 <tr><td>PDF and others</td><td>Off by default; admin may enable. Not processed by ImageMagick (Ghostscript policy stays disabled).</td></tr>
 </table>
+<h2>Playback</h2>
+<p>Pages use native HTML5 <code>video</code> and <code>audio</code> elements with <code>controls</code>. Authors use a media embed syntax in Markdown that the renderer expands (see <a href="../plan/content.html">content plan</a>); no author HTML is involved. Because H.264/AAC MP4 plays in all current browsers, a single MP4/M4A output is enough for 1.0; WebM/Opus variants are optional.</p>
 <h2>Risks and mitigations</h2>
 <ul>
 <li>Parser exploits: unprivileged user, no network (systemd sandboxing or <code>unshare</code>), CPU/memory/time limits, current distribution security updates.</li>

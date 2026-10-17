@@ -20,6 +20,15 @@
 <li>Cache the result keyed by commit hash; the worker invalidates on change.</li>
 </ol>
 <p>The site sends a strict <code>Content-Security-Policy</code> with no inline script or style, as a second line of defence.</p>
+<h2>Embedded media</h2>
+<ul>
+<li>Authors never write HTML for media. They use a Markdown-level syntax that the renderer expands, for example <code>![Caption](media:video/abc123)</code> or <code>![Caption](media:audio/abc123)</code>, where the id refers to a processed upload. Only processed, published uploads can be referenced.</li>
+<li>The renderer emits the player markup from an admin-controlled template: HTML5 <code>&lt;video controls&gt;</code> and <code>&lt;audio controls&gt;</code> elements with <code>preload="metadata"</code>, one source per transcoded format, a <code>poster</code> for video, and a text fallback link. These elements never pass through the author HTML allowlist, so it stays unchanged, and no script or inline style is involved (native browser controls only).</li>
+<li><strong>Video thumbnails</strong>: use an embedded cover image from the file metadata if present, otherwise extract a frame with ffmpeg.</li>
+<li><strong>Audio thumbnails</strong>: use embedded cover art (for example ID3 album art) if present and shown beside the player; otherwise none.</li>
+<li>Thumbnails are re-encoded images, handled like any other image upload.</li>
+<li>The Content-Security-Policy gains <code>media-src 'self'</code>; uploads remain served by the app, not directly from disk.</li>
+</ul>
 <h2>Revisioning</h2>
 <ul>
 <li>One git repository for content, separate from the code repository. Path: <code>&lt;type&gt;/&lt;slug&gt;.md</code>.</li>
@@ -29,10 +38,10 @@
 </ul>
 <h2>Uploads</h2>
 <ul>
-<li><strong>Safe by default</strong>: images (PNG, JPEG, GIF, WebP), video (MP4, WebM, MOV input), plain text, Markdown, CSV. SVG is excluded by default because it can carry script.</li>
-<li>Admin toggles can enable additional classes such as PDF, audio, video, archives.</li>
+<li><strong>Safe by default</strong>: images (PNG, JPEG, GIF, WebP), video (MP4, WebM, MOV input), audio (MP3, Ogg, FLAC, WAV, M4A input), plain text, Markdown, CSV. SVG is excluded by default because it can carry script.</li>
+<li>Admin toggles can enable additional classes such as PDF and archives.</li>
 <li><strong>Admin override</strong>: a file outside the enabled list lands in quarantine and is only published after an admin approves it individually.</li>
-<li><strong>Processing</strong>: images and video are never served as uploaded. A Redis task runs ImageMagick (images) and ffmpeg (video) as sandboxed subprocesses to re-encode, strip metadata and create thumbnails and poster frames; the processed copy is published only if every check passes. See <a href="../research/media-processing.html">media processing research</a>.</li>
+<li><strong>Processing</strong>: images and video are never served as uploaded. A Redis task runs ImageMagick (images) and ffmpeg (video and audio) as sandboxed subprocesses to re-encode, strip metadata and create thumbnails and poster frames; the processed copy is published only if every check passes. See <a href="../research/media-processing.html">media processing research</a>.</li>
 <li>Checks: extension and sniffed MIME must agree, size limit, files renamed to their content hash, stored outside the web root and served by the app with <code>X-Content-Type-Options: nosniff</code> and <code>Content-Disposition</code> set appropriately, optional ClamAV scan in the worker.</li>
 </ul>
 <h2>Other security basics</h2>
