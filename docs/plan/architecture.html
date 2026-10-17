@@ -11,6 +11,7 @@
 <tr><td>Language</td><td>Python 3 (the distribution's version; 3.12 on 24.04)</td></tr>
 <tr><td>Database</td><td>MySQL 8 (accounts, index, relations, settings)</td></tr>
 <tr><td>Queue</td><td>Redis, with a Python worker (RQ or a small in-house consumer; default RQ)</td></tr>
+<tr><td>Media</td><td>ffmpeg and ImageMagick run in the worker as sandboxed subprocesses; Python libraries are listed in <a href="../research/media-processing.html">research</a></td></tr>
 <tr><td>Revisions</td><td>git repository on disk, driven by the <code>git</code> binary</td></tr>
 <tr><td>Markdown</td><td>MultiMarkdown 6 (<code>multimarkdown</code> binary, via the worker/subprocess) with a pure-Python fallback</td></tr>
 </table>
@@ -18,7 +19,7 @@
 <ul>
 <li><strong>WSGI app</strong>: all page views, editing, login, search. Small framework (default: plain WSGI with a thin router, no heavy dependency).</li>
 <li><strong>CGI</strong>: only for a few small scripts, never the main app; kept for tiny, isolated endpoints (health check, upload receiver if separate privileges are wanted). Same code library as the WSGI app.</li>
-<li><strong>Worker</strong>: systemd service consuming the Redis queue. Jobs: render cache warm, reindex, upload scanning and thumbnails, git maintenance (gc), backups.</li>
+<li><strong>Worker</strong>: systemd service consuming the Redis queue. Jobs: render cache warm, reindex, upload scanning, image and video processing, git maintenance (gc), backups.</li>
 <li><strong>Git writes</strong> are serialised with a lock so concurrent saves cannot corrupt the repository. Each save is one commit authored by the logged-in user.</li>
 </ul>
 <h2>Repository layout</h2>
