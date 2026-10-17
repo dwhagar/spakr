@@ -19,7 +19,11 @@
 <tr><td>Free page</td><td>any other text: lore, rules, session notes</td><td>none beyond the common header</td></tr>
 </table>
 <h2>Settings</h2>
-<p>Each page carries one or more setting tags: <span class="tag">high fantasy</span> <span class="tag">modern / cosmic horror</span> <span class="tag">science fiction</span>. Settings are data, so admins can add more later.</p>
+<p>One game world per install. Each page carries one or more setting tags: <span class="tag">high fantasy</span> <span class="tag">modern / cosmic horror</span> <span class="tag">science fiction</span>. Settings are data, so admins can add more later. There are no separate campaigns in 1.0.</p>
+<h2>Visibility</h2>
+<p>Each page has a <code>visibility</code> field: <code>public</code> (default) or <code>gm</code>. GM-only pages are readable only by users with the GM or admin role. Every query path (view, list, search, backlinks, relations, history, diff, uploads attached to the page) filters on it. The content git repository holds all pages, so it must never be exposed directly and backups must be treated as GM-level.</p>
+<h2>Rules content</h2>
+<p>Stat blocks, dice and costs are free text in Markdown tables. There are no typed stat or dice fields in 1.0, so the site stays system-agnostic.</p>
 <h2>Relations</h2>
 <ul>
 <li>Typed links between pages stored in a <code>relation</code> table (from, to, kind, note), for example character <em>member of</em> nation-state, race <em>grants</em> special ability, item <em>requires</em> skill.</li>
@@ -27,6 +31,6 @@
 <li>Places form a tree through <code>parent_id</code>.</li>
 </ul>
 <h2>Other tables</h2>
-<p>users, roles, sessions, settings, html_allowlist, uploads (hash, mime, state, uploader), page_index (for search), audit_log.</p>
+<p>users, roles (admin, GM, editor, reader), sessions, settings, html_allowlist, uploads (hash, mime, state, uploader), page_index (for search), audit_log.</p>
 
 </main></body></html>
