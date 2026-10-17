@@ -37,7 +37,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 
 - [x] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
-- [ ] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
+- [x] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
 - [ ] **FND.3** WSGI entry point (daemon mode, pass-authorization on) and the small CGI shim (health and maintenance only) [0.1] — needs: FND.1, API.1, RES.16
 - [ ] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
 - [ ] **FND.5** Dev setup script for Ubuntu 24.04 [0.1] — needs: FND.1, RES.15
@@ -273,7 +273,7 @@ Issue: [#31](https://github.com/dwhagar/spakr/issues/31)
 
 - [ ] **CFG.1** examples/config.json.example listing every option, secrets marked, MySQL marked manual-only [0.1] — needs: FND.2, CFG.2
 - [ ] **CFG.2** Settings registry: each option defined once (key, type, default, secret, web-editable, validation) and used by the loader, API, UI and example [0.1] — needs: FND.2, RES.20
-- [ ] **CFG.3** MySQL credentials: manual-only in config.json; never exposed or editable through the API or UI; clear startup error if missing [0.1] — needs: FND.2, CFG.2
+- [x] **CFG.3** MySQL credentials: manual-only in config.json; never exposed or editable through the API or UI; clear startup error if missing [0.1] — needs: FND.2, CFG.2
 - [ ] **CFG.4** Settings store: non-secret settings in the database config table with typed access, caching and audit of changes [0.4] — needs: CFG.2, DB.2
 - [ ] **CFG.5** Secrets handling (decided): the app rewrites config.json atomically at mode 0600 with file locking; secret fields are write-only through the API and UI (set or unset, never returned), redacted in logs and audit [0.4] — needs: CFG.2, RES.20
 - [ ] **CFG.6** Live reload of changed settings across WSGI workers and the queue worker [0.4] — needs: CFG.4, CFG.5, QUE.2
