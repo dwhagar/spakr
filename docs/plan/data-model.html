@@ -4,7 +4,7 @@
 <body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="tree.html">Tree</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Data model</h1>
 
-<p>Every page has a common header (id, slug, type, title, setting tags, summary, created/updated, current git commit) and a Markdown body stored in git. Type-specific fields are stored in the database and mirrored in the page's YAML front matter so the git copy is self-describing.</p>
+<p>Every page has a common header (id, slug, type, title, setting tags, summary, created/updated, current git commit) and a Markdown body stored in git. Type-specific fields, tags, settings, visibility, aliases and relations are kept in the page's YAML front matter, which is the authoritative copy (GIT.9), and mirrored in database columns for browsing and filtering, so the whole index can be rebuilt from git alone (<a href="../research/content-store-choice.html">RES.29</a>). Each page also stores the SHA-256 of its file (<code>content_sha256</code>) for damage detection.</p>
 <h2>Entity types</h2>
 <table><tr><th>Type</th><th>Covers</th><th>Typical fields</th></tr>
 <tr><td>Character</td><td>PCs, NPCs, any named person</td><td>race, nation-state, home place, occupation, stats block (free text), affiliations</td></tr>

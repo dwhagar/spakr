@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.29 MySQL or git for page content - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="git-content-store.html">Git store</a><a href="backups.html">Backups</a><a href="search.html">Search</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.29: Where page content lives, MySQL or git, and how to make it survive damage</h1>
+<p><em>Research thread, 2026-10-17. Question from the owner: which is better for content, MySQL or git, with media always in its own directory tree? Added requirement: build from the ground up with checksums and parity so the database can be rebuilt if it is damaged. Measured on Ubuntu 24.04 (4 cores), git 2.43.0, MySQL 8.0.46, par2 from the Ubuntu package. Script: <code>poc/store_bench.py</code>. Builds on <a href="git-content-store.html">RES.4</a>, <a href="search.html">RES.7</a>, <a href="caching.html">RES.25</a> and <a href="backups.html">RES.17</a>.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Keep git as the source of truth for page content and keep MySQL as a rebuildable index (option A), and harden it.</strong> Nothing in the speed numbers forces a change, git is what the owner asked for, and for the new requirement git is the better base: its history is content-addressed, packfiles are immutable and so can carry write-once parity files, and everything MySQL holds about pages can be regenerated from it.</li>
+<li><strong>Make the git copy complete.</strong> Today the type-specific fields live in MySQL and are only "mirrored" in front matter. For a real rebuild the front matter must carry everything about a page that is not derived: fields, tags, settings, visibility, aliases and relations. Then <code>spakr rebuild-index</code> loses nothing. This is the one structural change (GIT.9).</li>
+<li><strong>Three layers of integrity</strong> (planned as INT.3, INT.4, INT.7, INT.10 and INT.13 in the integrity category): (1) detect: <code>git fsck</code> plus a SHA-256 of each page file stored in the index and compared on a schedule; (2) repair in place: <code>par2</code> parity (10 percent) written for every pack and every backup file; (3) rebuild: restore from the last bundle or a mirror clone, then rebuild the index. Tables that are not derived from git (accounts, keys, audit, settings) get <code>mysqldump</code> plus parity, because they cannot be rebuilt from content.</li>
+<li><strong>The honest price:</strong> a save is about 15 times slower than in MySQL (30 ms against 2 ms) and writers are serialised (about 33 saves a second, measured with 8 competing writers). For a game wiki with a few editors that is far above need. It changes if the numbers in "What would change this recommendation" are reached.</li>
+</ul>
+
+<h2>Measurements</h2>
+<p>5,000 pages of about 2.5 KB (450 words), single host, warm cache. MySQL side: one <code>pg</code> row plus one full-copy <code>rev</code> row per save in one transaction, with the version check done by <code>SELECT ... FOR UPDATE</code>. Git side: the RES.4 design (git binary, working tree, <code>flock</code>).</p>
+<table><tr><th>Measure</th><th>Git (source of truth)</th><th>MySQL (source of truth)</th></tr>
+<tr><td>One save, one writer</td><td>30 to 35 ms</td><td><strong>2 to 2.5 ms</strong></td></tr>
+<tr><td>One save with 20,000 files in the repository</td><td>79 to 82 ms (the cost grows with file count)</td><td>not affected</td></tr>
+<tr><td>8 writers at once, different pages</td><td>33 saves/s with the lock, 0 failures; <strong>without the lock 5 to 9 saves/s and 1,371 to 1,693 failed attempts</strong> in 2 to 3 s</td><td><strong>1,060 to 1,130 saves/s</strong>, 0 failures</td></tr>
+<tr><td>8 writers, the same page</td><td>serialised by the lock; conflict check by base commit (RES.4)</td><td>730 to 750 saves/s, 0 errors (row lock; version check in the UPDATE)</td></tr>
+<tr><td>Read current page body</td><td>0.02 ms from the working tree, 3.0 ms with <code>git show</code></td><td>0.25 ms by primary key</td></tr>
+<tr><td>Page history list (31 revisions)</td><td>9.4 ms <code>git log -- path</code></td><td>0.8 ms (this is the <code>page_revision</code> table already in the design)</td></tr>
+<tr><td>Diff of two revisions</td><td>3.0 ms</td><td>1.5 ms with Python <code>difflib</code> (own code)</td></tr>
+<tr><td>Blame, 31 revisions</td><td>4.3 ms, built in</td><td>14.3 ms with own word-level code over all revisions; the code would have to be written and tested</td></tr>
+<tr><td>History storage: 500 pages, 21 revisions each (current text 1.26 MB)</td><td>16.1 MB loose, <strong>2.4 MB after <code>git gc</code></strong></td><td><strong>34.4 MB</strong> as full copies, 10.9 MB if each copy were zlib-compressed</td></tr>
+<tr><td>Backup file after the benchmark run, 5,000 pages (about 13 MB of current text; the dump also holds one full copy per revision)</td><td>bundle 5.3 MB, 0.15 s</td><td>SQL dump 40 MB, 0.66 s</td></tr>
+<tr><td>Rebuild reading: all 5,000 pages</td><td>0.09 s from files; <code>git fsck</code> 0.20 s</td><td>0.08 s from MySQL</td></tr>
+</table>
+<p>Reading the table: every user-visible read sits behind the render cache (<a href="caching.html">RES.25</a>), so 0.02 ms against 0.25 ms does not matter. Writes are where MySQL wins by an order of magnitude and where git needs its lock. Storage is where git wins by an order of magnitude, because git stores deltas and MySQL stores a whole copy per revision unless delta code is added. Extrapolating the growth test, 5,000 pages edited 20 times each is about 24 MB in git and about 340 MB in MySQL: both are small on a modern disk, so storage is a backup and portability point more than a capacity point.</p>
+
+<h2>The options compared</h2>
+<p>A = git is the truth, MySQL a rebuildable index (current plan). B = MySQL is the truth, revisions in tables, git only an export. C1 = both written in every request, MySQL read first. C2 = like B but a queue job replays every revision into git (bare repository) for backup and tooling.</p>
+<table><tr><th>Criterion</th><th>A: git truth + index</th><th>B: MySQL truth</th><th>C: hybrids</th></tr>
+<tr><td>Concurrent edits and conflicts</td><td>Lock serialises writers; per-page conflict by base commit; ~33 saves/s</td><td>Row locks; conflict check is one <code>UPDATE ... WHERE version=?</code>; 1,000+ saves/s</td><td>As B (C2); C1 has both costs</td></tr>
+<tr><td>History, diff, blame, revert</td><td>Native, tested tools; <code>log --follow</code> across renames</td><td>Easy list and diff; blame and rename tracking are own code</td><td>C2: git tools available after export lag</td></tr>
+<tr><td>Attribution</td><td>Author per commit, pseudonymous identity; erasing a person means rewriting history (avoided by the pseudonym)</td><td>Author id column; erasure is an UPDATE</td><td>Same split</td></tr>
+<tr><td>GM-only and permissions</td><td>Same in both: history, diff and blame are served only by the app, which filters by the page row. A cloned repository would show GM pages, so the repository must not be shared raw</td><td>Same rule; no raw clone to leak</td><td>C2 export has the same leak risk as A</td></tr>
+<tr><td>Atomicity of store and index</td><td><strong>Two stores</strong>: git then MySQL under the lock; a crash between them leaves the index behind. Healed by the start-up check and per-page reindex (idempotent)</td><td><strong>One transaction</strong> covers revision, search row, relations and visibility</td><td>C1 adds a third failure mode; C2 is eventually consistent for the export only</td></tr>
+<tr><td>Full-text search</td><td>InnoDB FULLTEXT in the index, written after the commit</td><td>Same, in the same transaction</td><td>Same</td></tr>
+<tr><td>Backup, restore, portability</td><td>Bundle was 7 times smaller than the dump in the benchmark; plain Markdown files can be read, grepped and edited without the app; two backup parts must match (manifest records git HEAD)</td><td>One dump holds everything; content is not readable without MySQL</td><td>C2 gives both at the price of the export job</td></tr>
+<tr><td>Disk growth</td><td>~14 times smaller after gc (weekly job)</td><td>Full copies; delta code would be needed to match</td><td>C2: both stores grow</td></tr>
+<tr><td>Scale to tens of thousands of pages</td><td>Save time grows with file count (82 ms at 20,000); fine to about that size</td><td>Flat</td><td>As B</td></tr>
+<tr><td>Operation under Apache mod_wsgi</td><td>Needs the git binary, a writable repository owned by the app user, one lock file, a gc job; local filesystem only (no NFS)</td><td>Only the database client the app already needs</td><td>C2 needs a worker for the export</td></tr>
+<tr><td>Failure modes</td><td>Stale <code>index.lock</code>, dirty tree after a crash (handled in RES.4); corrupt pack (see below)</td><td>Rolled-back transactions are clean; a corrupt InnoDB page stops the server (see below)</td><td>Combined</td></tr>
+<tr><td>Fit for the owner's wish for git revisioning</td><td><strong>Exact</strong></td><td>Only as an export; history is not git's</td><td>C2 is close, but git is then a copy</td></tr>
+</table>
+
+<h2>Checksums, parity and rebuild, measured</h2>
+<p>Test repository: 2,000 pages, 10 revisions each, packed with <code>git gc</code> (3.3 MB pack). Test MySQL table: 2,000 pages in an InnoDB file of 14 MB.</p>
+<table><tr><th>Step</th><th>Git</th><th>MySQL (InnoDB)</th></tr>
+<tr><td>Checksums built in</td><td>Every object is named by its hash; trees and commits chain them, so any change is visible. Packs and pack indexes carry their own checksums. Hash is SHA-1 (collision-hardened in 2.43); a SHA-256 object format exists but is experimental and not widely supported, so the app should store its own SHA-256 of each page file</td><td>Every 16 KB page has a CRC32C checksum. No per-row or per-revision content hash unless the application adds one</td></tr>
+<tr><td>Damage detection</td><td>Flipping one byte in the pack: <code>git fsck --full</code> reported <em>pack checksum mismatch</em>, <em>index CRC mismatch</em> for the object and an <em>inflate</em> error. Pages whose objects were intact still read</td><td>100 bytes flipped in one page: <code>innochecksum</code> reported <em>page 20 invalid</em>. The running server logged <em>Database page corruption ... You may have to recover from a backup</em> on the first <code>SELECT</code>, and <strong>the connection was lost and the server was down afterwards</strong>; every start-and-read repeated it. One bad page takes the whole site (accounts included) offline</td></tr>
+<tr><td>Parity (Reed-Solomon, <code>par2</code>)</td><td>Pack is immutable, so parity is written once: 10 percent redundancy was 696 KB for the 3.3 MB pack, created in 0.19 s. Three separate damaged runs of 200 bytes were <strong>repaired byte-identical in 0.06 s</strong>, and <code>git fsck</code> was clean afterwards</td><td>Table files change constantly, so parity cannot sit beside them; it can only cover dumps. The benchmark dump was about 7 times bigger than the bundle, so parity files would be too</td></tr>
+<tr><td>Redundancy that needs no parity</td><td>A second clone or a bundle contains the same objects: <code>git fetch</code> from it replaces a lost object. Cloned the 2,000-page bundle and <code>fsck</code> passed</td><td>Replica or restore from dump; edits since the last dump are lost unless the binary log is kept</td></tr>
+<tr><td>Rebuild</td><td>Index rebuilt from the repository: reading 5,000 pages took 0.09 s, the rest is the index write (DB.3). Loses nothing once the front matter is complete</td><td>If MySQL is the truth, the rebuild source is a dump; there is nothing to rebuild from</td></tr>
+</table>
+<h3>What this means</h3>
+<ul>
+<li><strong>Only option A has a layer that can rebuild the database from something other than a backup of itself.</strong> In B or C2, the "rebuild" is a restore, and the newest edits since the last dump are the ones at risk. C2 narrows this by exporting to git continuously, which is option A with extra steps and a second writer.</li>
+<li><strong>Parity belongs on immutable, content-addressed files:</strong> packs and bundles. Loose objects (edits since the last repack) are not covered until packed, so the repack job should run daily, not weekly, and write parity for each new pack. The window between edit and parity is covered by the mirror (push after each commit, or a bundle at the next backup).</li>
+<li><strong>Not everything can be rebuilt.</strong> Accounts, roles, API key hashes, sessions, invitations, audit log, settings and the email outbox are not in git. They go in the dump (RES.17) with parity, and a separate small export (JSON lines) of accounts and settings is worth writing beside the git repository so a corrupted database does not need the dump to restart. The audit log is the one table where loss matters and rebuild is impossible.</li>
+<li><strong>Verify, then repair, then rebuild</strong> is the order for a command-line tool: <code>spakr verify</code> (fsck, parity check, compare each page's stored SHA-256 and <code>current_commit</code> with the file), <code>spakr repair</code> (parity repair, then fetch missing objects from the mirror or a bundle), <code>spakr rebuild-index</code> (DB.3).</li>
+<li><strong>Media</strong> is outside this comparison, but the same rule applies: originals are the only irreplaceable files (variants regenerate), each already has a SHA-256 in the media table, and an optional parity file per original is a sensible default for the privately kept originals.</li>
+</ul>
+
+<h2>Migration impact on the existing plan and schema</h2>
+<p>Recommendation A changes no table. It adds, without altering existing columns:</p>
+<ul>
+<li><code>page.content_sha256</code> (CHAR(64)): hash of the page file at <code>current_commit</code>, the cheap drift check. Added to DB.2 (migration 0003).</li>
+<li>GIT.9 (new): front matter is complete and authoritative (fields, tags, settings, visibility, aliases, relations), so the "fixed export of the non-git tables" shrinks to accounts, keys, audit and settings. Needs RES.13, the front matter schema, and feeds DB.3 and INT.1.</li>
+<li>Already planned and confirmed by these results: INT.4 (git fsck and page files against the index; also compare the stored hash), INT.7 (parity for the content store: <code>par2</code> worked on packs, see the table; the choice itself stays with RES.26), INT.9 (journal of MySQL-only data), INT.10 and INT.13 (verify and repair). Suggested wording for them: daily repack so loose objects reach a pack, a mirror push after each commit, and parity written for each new pack.</li>
+</ul>
+<p>If the owner chooses B instead, the plan changes more: GIT.1 to GIT.7 become revision-table items (revision table with full copies or deltas, blame code, a git export job for C2), GIT.5 and DB.3 disappear (the index is in the same transaction), and the rebuild requirement is met only by dump plus binary log. That would also remove the owner's git revisioning as a primary store.</p>
+
+<h2>What would change this recommendation</h2>
+<ul>
+<li>Sustained edit rates above about 20 saves a second, or more than about 20,000 pages (82 ms a save and growing): then B, or A with the plumbing write path from RES.4.</li>
+<li>More than one web host: <code>flock</code> and a local repository stop working (B, or a git service in front).</li>
+<li>A need for atomic multi-page changes with rollback (large imports, rename that rewrites links in many pages): a single git commit under the lock covers it, but if drift between git and MySQL appears in practice during testing (TST), B becomes more attractive.</li>
+<li>Legal erasure of an author's history that pseudonymous commit identities cannot satisfy.</li>
+<li>If completing the front matter proves unworkable (for example relations that must be edited from either end), the "git is complete" claim fails and option C2 is the next choice.</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Git behaviour above 20,000 files was measured only for the save time; <code>fsck</code>, <code>gc</code> and parity times at that size were not.</li>
+<li>Parity on loose objects, and parity written automatically after every <code>git gc</code>, were not exercised; the test packed once and damaged the pack.</li>
+<li>The InnoDB test was one corrupted page in one table; behaviour with <code>innodb_force_recovery</code> and what data can be salvaged was not tried. Whether this MySQL always stops the server on a bad page (rather than failing the single query) was seen on this version only.</li>
+<li>The MySQL numbers use full-copy revisions; a delta scheme would shrink the storage gap and slow reads and blame. Network latency to a remote database server was not included.</li>
+<li>SHA-256 object format for git was not tried.</li>
+</ul>
+</main></body></html>

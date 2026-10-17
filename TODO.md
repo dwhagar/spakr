@@ -71,7 +71,7 @@ Issue: [#12](https://github.com/dwhagar/spakr/issues/12)
 
 - [x] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
 - [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, type tables, page_search, media, html_allowlist, upload_policy
-- [ ] **DB.3** Command to rebuild all derived MySQL data (page index, search tables, relations) from the git content store; resumable, dry-run option [0.2] — needs: DB.2, GIT.5, SEARCH.2, INT.1
+- [ ] **DB.3** Command to rebuild all derived MySQL data (page index, search tables, relations) from the git content store; resumable, dry-run option [0.2] — needs: DB.2, GIT.5, SEARCH.2, INT.1, GIT.9
 - [ ] **DB.4** Database backup and restore script [0.9] — needs: DB.2
 - [x] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
 
@@ -95,6 +95,7 @@ Issue: [#14](https://github.com/dwhagar/spakr/issues/14)
 - [ ] **GIT.5** MySQL page index kept in step on every write [0.2] — needs: GIT.2, DB.2
 - [ ] **GIT.6** Slug rules, rename and move [0.2] — needs: GIT.2
 - [ ] **GIT.7** Edit conflict detection based on the base commit [0.2] — needs: GIT.2
+- [ ] **GIT.9** Complete front matter: the page file carries everything about a page that is not derived (typed fields, tags, settings, visibility, aliases, relations), so the MySQL index can be rebuilt from git alone; page.content_sha256 records the file hash for INT.4 (RES.29) [0.2] — needs: GIT.2, RES.13, RES.29
 
 ## RND: Rendering and sanitising
 
@@ -290,8 +291,9 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
 - [x] **RES.25** Caching of rendered pages in memory and on disk: key by content, layers, eviction, link-status pass (docs/research/caching.html) [0.0]
 - [ ] **RES.26** Parity and redundancy for /data: par2-style parity versus erasure coding (zfec, reedsolo) versus filesystem options (ZFS or btrfs scrub, dm-integrity, RAID); cost for 100 MB videos and for git packs, how parity is stored and refreshed, recovery procedure [0.0]
-- [ ] **RES.27** Source of truth versus rebuildable: classify every table and file; what lives only in MySQL (accounts, settings, audit, invitations) and so needs a checksummed journal; what is rebuilt from the git content store and media originals; depends on the MySQL-versus-git findings [0.0]
+- [ ] **RES.27** Source of truth versus rebuildable: classify every table and file; what lives only in MySQL (accounts, settings, audit, invitations) and so needs a checksummed journal; what is rebuilt from the git content store and media originals; depends on the MySQL-versus-git findings (done: RES.29) [0.0]
 - [ ] **RES.28** Checksum design: hash algorithm (SHA-256 versus BLAKE2 in hashlib), manifest format and location, row or table checksums and an audit hash chain in MySQL, migration records, cost of scheduled verification [0.0]
+- [x] **RES.29** MySQL or git for page content: measured saves, concurrency, history, growth, backups and corruption trials; git stays the source of truth (docs/research/content-store-choice.html) [0.0]
 
 ## TST: Testing and sample content
 
