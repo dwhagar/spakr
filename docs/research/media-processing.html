@@ -25,7 +25,7 @@
 <tr><td>Templates</td><td><code>Jinja2</code></td><td>Autoescaping on.</td></tr>
 <tr><td>HTML sanitising</td><td><code>nh3</code> (Rust binding to ammonia) with an allowlist; <code>bleach</code> is deprecated</td><td>Allowlist comes from the admin-approved table.</td></tr>
 <tr><td>Markdown fallback</td><td><code>markdown-it-py</code> or <code>markdown</code></td><td>Only if the <code>multimarkdown</code> binary is unavailable.</td></tr>
-<tr><td>Math to static markup</td><td>Evaluate: <code>latex2mathml</code> (pure Python), or KaTeX via Node at build/worker time</td><td>Decide in 0.3; MathML needs no client script.</td></tr>
+<tr><td>Math to static markup</td><td><code>latex2mathml</code> (pure Python; no Node anywhere, decided)</td><td>MathML needs no client script.</td></tr>
 <tr><td>Git</td><td>Subprocess to <code>git</code>; <code>GitPython</code> or <code>pygit2</code> are options</td><td>Default: subprocess, same reasoning as above.</td></tr>
 <tr><td>Passwords</td><td><code>argon2-cffi</code></td><td></td></tr>
 <tr><td>WSGI</td><td><code>mod_wsgi</code> from apt (<code>libapache2-mod-wsgi-py3</code>)</td><td>Must match the system Python; use a venv via <code>python-home</code>.</td></tr>

@@ -6,9 +6,9 @@
 
 <h2>Packages (Ubuntu LTS)</h2>
 <pre>apt install apache2 libapache2-mod-wsgi-py3 mysql-server redis-server \
-            git python3 python3-venv nodejs \\
+            git python3 python3-venv \\
             ffmpeg imagemagick libmagic1</pre>
-<p>Enable modules: <code>a2enmod wsgi cgid headers rewrite</code>. <code>nodejs</code> is used only to render maths (optional; formulas show as TeX source without it). MySQL needs <code>innodb_ft_min_token_size=2</code> and <code>innodb_ft_enable_stopword=OFF</code> in <code>mysqld.cnf</code> for search to find short terms such as HP or Mi-Go (<a href="../research/search.html">RES.7</a>).</p>
+<p>Enable modules: <code>a2enmod wsgi cgid headers rewrite</code>. No Node.js is needed anywhere. MySQL needs <code>innodb_ft_min_token_size=2</code> and <code>innodb_ft_enable_stopword=OFF</code> in <code>mysqld.cnf</code> for search to find short terms such as HP or Mi-Go (<a href="../research/search.html">RES.7</a>).</p>
 <h2>Services</h2>
 <ul>
 <li><code>apache2</code>: serves the WSGI app and CGI scripts.</li>

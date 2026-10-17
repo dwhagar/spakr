@@ -1,12 +1,13 @@
 """Proof of concept: Markdown -> sanitised HTML with server-side math and trusted markup swapped in after sanitising."""
-import html, json, os, re, secrets, subprocess
+import html, re, secrets
 import markdown
 import nh3
 from markdown.extensions.wikilinks import WikiLinkExtension
+from math_poc import tex_to_mathml
 
 MATH = re.compile(r'\\{1,2}\((.+?)\\{1,2}\)|\\{1,2}\[(.+?)\\{1,2}\]', re.S)  # MMD uses \\( \\) and \\[ \\]
 
-def render(src, allowed_tags, allowed_attrs, node_cmd=('node', 'math_batch.js')):
+def render(src, allowed_tags, allowed_attrs):
     nonce = secrets.token_hex(6)
     formulas = []
 
@@ -20,9 +21,8 @@ def render(src, allowed_tags, allowed_attrs, node_cmd=('node', 'math_batch.js'))
     clean = nh3.Cleaner(tags=allowed_tags, attributes=allowed_attrs, url_schemes={'http', 'https', 'mailto'},
                         link_rel='noopener noreferrer nofollow', strip_comments=True).clean(body)
     if formulas:
-        res = json.loads(subprocess.run(node_cmd, input=json.dumps(formulas), capture_output=True, text=True, timeout=10, check=True).stdout)
-        for i, ml in enumerate(res):
-            ml = re.sub(r' style="[^"]*"', '', ml) if ml else f'<code class="math-error">{html.escape(formulas[i]["tex"])}</code>'
+        for i, f in enumerate(formulas):
+            ml = tex_to_mathml(f['tex'], f['display']) or f'<code class="math-error">{html.escape(f["tex"])}</code>'
             clean = clean.replace(f'SPAKRMATH{nonce}X{i}X', ml)
     return clean
 

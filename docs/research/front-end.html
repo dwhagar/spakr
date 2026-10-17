@@ -24,7 +24,7 @@
 <tr><td><code>eval()</code> and <code>new Function()</code></td><td><strong>Blocked</strong> (EvalError)</td><td>Libraries that compile templates or expressions at run time need a CSP-safe build or are excluded. Alpine's default build is documented to need <code>unsafe-eval</code> and ships a separate CSP build; htmx has an option to disable evaluation (both from their documentation as I know it, not tested here).</td></tr>
 <tr><td>External stylesheet and ES modules (static and dynamic <code>import()</code>), <code>fetch()</code> to our origin</td><td>Work</td><td>The planned structure.</td></tr>
 <tr><td>Custom elements (web components)</td><td>Work</td><td>A no-library component model is available.</td></tr>
-<tr><td>MathML from Temml with style attributes removed</td><td>Renders; display math stays a block through the shipped CSS class</td><td>See <a href="math-rendering.html">RES.2</a>.</td></tr>
+<tr><td>MathML from latex2mathml (no inline styles)</td><td>Renders; display math stays a block through the shipped CSS class</td><td>See <a href="math-rendering.html">RES.2</a>.</td></tr>
 <tr><td><code>&lt;script type="application/ld+json"&gt;</code></td><td>Readable, no violation</td><td>See <a href="seo.html">RES.8</a>.</td></tr>
 <tr><td><code>import maps</code> (<code>&lt;script type="importmap"&gt;</code>)</td><td>Inline, so it needs a nonce or hash (not tested)</td><td>Avoid; use relative imports.</td></tr>
 </table>
