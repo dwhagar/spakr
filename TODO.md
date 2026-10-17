@@ -4,6 +4,8 @@ Current version: **0.0.0** (see [`VERSION`](VERSION) and [`scripts/version.sh`](
 
 Items are numbered `[CAT].[NUMBER]`, for example `API.1`. Each item shows its phase in square brackets (the MINOR version that delivers it) and `needs:` the ids it depends on, so the list forms a tree rooted in phase 0.0 research and the foundation. Phases 0.1 to 0.8 are building blocks; **0.9 is the pre-release working version**; 1.0 is the release. See the [phase plan](docs/plan/tiers.html) and the [dependency tree](docs/plan/tree.html).
 
+**Standing requirement:** every UI item is responsive and works in light and dark mode from the start (UI.11 to UI.13 are the base; UI.13 is the checklist all later UI items meet).
+
 Each category is a GitHub issue holding the same checklist (ids, titles, phases). Bugs and suggestions arrive as their own issues and are folded in here when accepted. Numbers are never reused; new items are appended. This file is kept by the TODO thread and is the source of truth: change it and the matching issue together.
 
 
@@ -27,6 +29,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5
 - [ ] **DOC.4** Editor guide: writing pages, links, media syntax, visibility [0.9] — needs: UI.4, MED.7, LNK.1
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
+- [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 
 ## FND: Foundation
 
@@ -179,7 +182,7 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.4** Image processing with ImageMagick as queue tasks [0.7] — needs: MED.3, QUE.2, RES.10
 - [ ] **MED.5** Video and audio transcoding with ffmpeg as queue tasks [0.7] — needs: MED.3, QUE.2, RES.10
 - [ ] **MED.6** Gated thumbnail series, never enlarged [0.7] — needs: MED.4, MED.5
-- [ ] **MED.7** media: Markdown syntax and HTML5 players [0.7] — needs: RND.1, MED.6
+- [ ] **MED.7** media: Markdown syntax and HTML5 players [0.7] — needs: RND.1, MED.6, UI.14
 - [ ] **MED.8** Admin purge of originals [0.7] — needs: MED.3, AUTH.3
 
 ## UI: Web UI (first-party JavaScript client)
@@ -187,15 +190,19 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 
 - [ ] **UI.1** JavaScript client scaffold, served from our origin with hashed assets [0.1] — needs: FND.3, RES.11
-- [ ] **UI.2** Server-rendered public reading pages with SEO markup [0.8] — needs: UI.1, RND.5, ENT.13
-- [ ] **UI.3** Login, invitation and account screens [0.8] — needs: UI.1, AUTH.4, AUTH.5, AUTH.10
-- [ ] **UI.4** Page editor with preview [0.8] — needs: UI.2, RND.6, GIT.7
-- [ ] **UI.5** History, diff and revert screens [0.8] — needs: UI.2, GIT.4
-- [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, SEARCH.5, LNK.4
-- [ ] **UI.7** Admin screens: settings, allowlist, users, API keys [0.8] — needs: UI.3, AUTH.6, AUTH.8, AUTH.9, LNK.6
-- [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, MED.7
-- [ ] **UI.9** Licence statement in the footer and on edit/upload pages [0.8] — needs: UI.2
-- [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, LNK.7
+- [ ] **UI.2** Server-rendered public reading pages with SEO markup [0.8] — needs: UI.13, UI.14, RND.5, ENT.13
+- [ ] **UI.3** Login, invitation and account screens [0.8] — needs: UI.13, AUTH.4, AUTH.5, AUTH.10
+- [ ] **UI.4** Page editor with preview [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
+- [ ] **UI.5** History, diff and revert screens [0.8] — needs: UI.2, UI.13, GIT.4
+- [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, UI.13, SEARCH.5, LNK.4
+- [ ] **UI.7** Admin screens: settings, allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
+- [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, UI.13, MED.7
+- [ ] **UI.9** Licence statement in the footer and on edit/upload pages [0.8] — needs: UI.2, UI.13
+- [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, UI.13, LNK.7
+- [ ] **UI.11** Responsive layout base: mobile-first CSS, fluid grid and navigation, readable at phone width, no horizontal page scroll (standing requirement from the first screen) [0.1] — needs: UI.1
+- [ ] **UI.12** Theme tokens: light and dark palettes as CSS variables following prefers-color-scheme, plus a user toggle stored server-side so it works without inline script [0.1] — needs: UI.11
+- [ ] **UI.13** UI acceptance checklist applied to every UI item: responsive at phone, tablet and desktop widths, correct in light and dark, keyboard usable [0.1] — needs: UI.11, UI.12
+- [ ] **UI.14** Responsive, themed tables, code blocks and HTML5 media players in rendered pages [0.3] — needs: UI.12, RND.1
 
 ## OPS: Hardening and operations
 
@@ -204,7 +211,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.1** Security review [0.9] — needs: UI.7, UI.8, SEARCH.6, VIS.3
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
-- [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, RES.18
+- [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, RES.18, UI.13
 - [ ] **OPS.5** Backup script covering git store, MySQL and media [0.9] — needs: DB.4, GIT.1, MED.3, RES.17
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5

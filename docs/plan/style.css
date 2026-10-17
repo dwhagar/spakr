@@ -1,8 +1,16 @@
-body{font-family:system-ui,sans-serif;line-height:1.55;margin:0;color:#1d2330;background:#fafbfc}
-nav{background:#1d2330;padding:.6rem 1rem}nav a{color:#cfe0ff;margin-right:1rem;text-decoration:none}
-main{max-width:56rem;margin:0 auto;padding:1rem 1.25rem 4rem}
-h1,h2,h3{line-height:1.2}table{border-collapse:collapse;width:100%;margin:1rem 0}
-th,td{border:1px solid #cdd3dd;padding:.4rem .6rem;text-align:left;vertical-align:top}th{background:#eef1f6}
-code{background:#eef1f6;padding:0 .25rem;border-radius:3px}pre{background:#eef1f6;padding:.8rem;overflow:auto}
-.tag{display:inline-block;padding:0 .5rem;border-radius:1rem;background:#dbe7ff;font-size:.85rem}
-.q{background:#fff6dd;border-left:4px solid #e0a800;padding:.1rem 1rem;margin:1rem 0}
+:root{color-scheme:light dark;--bg:#fafbfc;--ink:#1d2330;--muted:#566;--line:#cdd3dd;--head:#eef1f6;--code:#eef1f6;--navbg:#1d2330;--navfg:#cfe0ff;--link:#1a56c4;--tag:#dbe7ff;--qbg:#fff6dd;--qline:#e0a800;--box:#dbe7ff;--boxnow:#fff6dd;--boxdone:#d9f2e0}
+@media (prefers-color-scheme:dark){:root{--bg:#14171e;--ink:#e3e7ee;--muted:#9aa4b5;--line:#39414f;--head:#1f2430;--code:#232938;--navbg:#0d0f14;--navfg:#a9c4ff;--link:#8db4ff;--tag:#27385e;--qbg:#2e2810;--qline:#c79a1a;--box:#25345a;--boxnow:#3a3216;--boxdone:#1f4030}}
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;line-height:1.55;margin:0;color:var(--ink);background:var(--bg)}
+a{color:var(--link)}
+nav{background:var(--navbg);padding:.6rem 1rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}nav a{color:var(--navfg);text-decoration:none}
+main{max-width:56rem;margin:0 auto;padding:1rem 1rem 4rem}
+h1,h2,h3{line-height:1.2}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid var(--line);padding:.4rem .6rem;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:var(--head)}
+code{background:var(--code);padding:0 .25rem;border-radius:3px;overflow-wrap:anywhere}pre{background:var(--code);padding:.8rem;overflow:auto}
+.tag{display:inline-block;padding:0 .5rem;border-radius:1rem;background:var(--tag);font-size:.85rem}
+.q{background:var(--qbg);border-left:4px solid var(--qline);padding:.1rem 1rem;margin:1rem 0}
+svg{max-width:100%;height:auto}
+@media (max-width:40rem){table,thead,tbody,tr{font-size:.9rem}main{padding:.75rem .75rem 3rem}}
+svg .box{fill:var(--head);stroke:var(--muted)}svg .txt{fill:var(--ink)}svg .edge{stroke:var(--muted);fill:none}svg marker path{fill:var(--muted)}
