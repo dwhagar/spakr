@@ -42,6 +42,8 @@
 <li>Admin toggles can enable additional classes such as PDF and archives.</li>
 <li><strong>Admin override</strong>: a file outside the enabled list lands in quarantine and is only published after an admin approves it individually.</li>
 <li><strong>Processing</strong>: images and video are never served as uploaded. A Redis task runs ImageMagick (images) and ffmpeg (video and audio) as sandboxed subprocesses to re-encode, strip metadata and create thumbnails and poster frames; the processed copy is published only if every check passes. See <a href="../research/media-processing.html">media processing research</a>.</li>
+<li><strong>Size limits</strong>: 10 MB for general files and images, 100 MB for video (admin adjustable).</li>
+<li><strong>Originals</strong>: kept after processing, stored privately outside the web root, never served, and excluded from the public file listing. Admins can purge originals (single file, by age, or all) from the admin screen or a maintenance script. Backups include or exclude them by option.</li>
 <li>Checks: extension and sniffed MIME must agree, size limit, files renamed to their content hash, stored outside the web root and served by the app with <code>X-Content-Type-Options: nosniff</code> and <code>Content-Disposition</code> set appropriately, optional ClamAV scan in the worker.</li>
 </ul>
 <h2>Other security basics</h2>

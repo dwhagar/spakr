@@ -18,7 +18,7 @@
 <tr><td>Video</td><td>Video and audio allowed by default, always transcoded by ffmpeg; shown with native HTML5 players, thumbnails from metadata or a video frame, audio cover art when present</td></tr>
 <tr><td>Media embedding</td><td>Markdown-level <code>media:</code> syntax expanded by the renderer into admin-controlled player markup; authors write no HTML</td></tr>
 <tr><td>Media library calls</td><td>subprocess for ffmpeg and ImageMagick (not Wand or ffmpeg-python); Pillow for in-process checks</td></tr>
-<tr><td>Upload size limit</td><td>10 MB for general files, admin adjustable; separate larger limit for video to be set in 0.8</td></tr>
+<tr><td>Upload size limit</td><td>10 MB for general files and images; 100 MB for video; both admin adjustable</td></tr>
 <tr><td>Python</td><td>Distribution Python 3 on each LTS</td></tr>
 </table></div>
 <h2>Questions (all resolved)</h2>
@@ -31,7 +31,7 @@
 <tr><td>GitHub Pages?</td><td>Enable from <code>/docs</code>.</td></tr>
 </table>
 <h2>Still open</h2>
-<ul><li>Maximum video size and whether to keep original uploads after transcoding.</li></ul>
+<p>None at the moment. Resolved late: video limit 100 MB; originals kept privately after transcoding with an admin purge option.</p>
 <h2>Licence (resolved)</h2>
 <p>Code is MIT (<code>LICENSE</code>). Game content is CC BY-SA 4.0 (<code>CONTENT-LICENSE.md</code>); the site footer and upload/edit pages should state this in 1.0.</p>
 </main></body></html>
