@@ -17,8 +17,8 @@ jobs:
           python-version: '3.12'
       - name: Run tests if any exist
         run: |
-          if [ -d tests ] || [ -d src/tests ]; then
-            python -m pip install pytest
+          if [ -d tests ]; then
+            python -m pip install -e '.[dev]'
             python -m pytest
           else
             echo "No tests yet."
