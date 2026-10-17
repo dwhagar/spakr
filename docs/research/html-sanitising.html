@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.3 HTML sanitiser and the admin allowlist - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.3: HTML sanitiser and the admin allowlist</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks RND.3 and AUTH.9; feeds RND.4. Experiments on Ubuntu 24.04.5 with nh3 0.3.7 and bleach 6.4.0 installed from PyPI.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>nh3 0.3.7</strong> (MIT, Python binding to Rust's ammonia sanitiser; wheels for every common platform, including Python 3.12 on Linux). Not in Ubuntu 24.04's archive, so it comes from the pinned virtualenv (<a href="packaging.html">RES.15</a>). Roughly <strong>30 times faster than bleach</strong> in the test below.</li>
+<li><strong>Allowlist, not blocklist.</strong> One sanitiser pass over the whole rendered HTML (Markdown output and author-written raw HTML together). The tag and attribute allowlist is <strong>the fixed baseline that Markdown produces</strong> (paragraphs, lists, tables, headings, code, links, footnotes, definition lists, abbreviations, sub/sup) <strong>plus whatever the admin approves</strong>. An author who types raw <code>&lt;table&gt;</code> gets what Markdown would have given them anyway; anything beyond the baseline is stripped until an admin approves it (AUTH.9).</li>
+<li><strong>Build the nh3 <code>Cleaner</code> once per allowlist version</strong> and cache it in the process. The <code>html_allowlist</code> table (tag and optional attribute rows) maps directly onto the Cleaner's <code>tags</code> and <code>attributes</code> arguments. Changing the allowlist bumps a version number that also invalidates rendered pages (<a href="caching.html">caching</a>).</li>
+<li><strong>Some things the admin cannot approve:</strong> <code>script</code>, <code>style</code>, <code>iframe</code>, <code>object</code>, <code>embed</code>, <code>form</code> and form controls, <code>link</code>, <code>meta</code>, <code>base</code>, <code>svg</code>, <code>math</code> (our own maths is inserted after the sanitiser), <code>template</code>, <code>noscript</code>, and every <code>on*</code> and <code>style</code> attribute. The approval API rejects these names.</li>
+<li><strong>Rules applied through nh3's <code>attribute_filter</code> and options</strong> (all tested): <code>id</code> values get a <code>user-content-</code> prefix (stops DOM clobbering and anchor collisions; nh3 also has an <code>id_prefix</code> option), <code>class</code> keeps only names starting with <code>u-</code>, <code>href</code> allows <code>http</code>, <code>https</code>, <code>mailto</code> and relative URLs only (and drops protocol-relative <code>//host</code>), <code>img src</code> only allows our own <code>/media/</code> paths (an external image would leak readers' addresses and violates the CSP <code>img-src 'self'</code> anyway), <code>strip_comments</code> is on.</li>
+</ul>
+
+<h2>Experiments</h2>
+<h3>XSS corpus, nh3 and bleach side by side</h3>
+<p>23 inputs (script tags, event handlers, <code>javascript:</code> and <code>data:</code> URLs including whitespace-obfuscated, SVG with <code>onload</code>, <code>style</code> attributes, <code>&lt;style&gt;</code> with <code>@import</code>, iframe, form, MathML <code>xlink:href</code> and <code>mglyph</code> mutation, <code>noscript</code> mutation, conditional comments, nested broken tags, meta refresh, base, link, protocol-relative URLs) through the same allowlist. Both libraries removed every executable construct. Differences found:</p>
+<table><tr><th>Input</th><th>nh3</th><th>bleach</th></tr>
+<tr><td><code>&lt;script&gt;alert(1)&lt;/script&gt;x</code></td><td><code>x</code> (script content dropped)</td><td><code>alert(1)x</code> (tag removed, code left as text)</td></tr>
+<tr><td><code>&lt;style&gt;@import "x";&lt;/style&gt;t</code></td><td><code>t</code></td><td><code>@import "x";t</code></td></tr>
+<tr><td><code>&lt;a href="javascript:..."&gt;</code></td><td>href removed, <code>rel</code> added</td><td>href removed</td></tr>
+<tr><td><code>&lt;noscript&gt;&lt;p title="&lt;/noscript&gt;&lt;img src=x onerror=alert(1)&gt;"&gt;</code></td><td>kept escaped text and a plain <code>&lt;img src="x"&gt;</code> with no handler (image allowed in this test)</td><td><code>&lt;p&gt;&lt;/p&gt;</code></td></tr>
+<tr><td><code>&lt;a href="//evil.example/x"&gt;</code></td><td>kept (protocol-relative); remove with the filter</td><td>kept</td></tr>
+</table>
+<p>The nh3 handling of script and style content (dropping it entirely) is the safer default; bleach needs <code>strip=True</code> and still leaves the text.</p>
+
+<h3>Speed</h3>
+<p>A 24.9 KB rendered page (the sample document repeated 30 times): <strong>nh3 0.99 ms, bleach 30 ms</strong> per clean (mean of 50). Both are small next to Markdown (about 13 ms for the same page) but nh3 keeps the preview endpoint and bulk reindexing cheap.</p>
+
+<h3>Allowlist mapping, tested</h3>
+<pre>cl = nh3.Cleaner(
+    tags=baseline_tags | approved_tags,
+    attributes=baseline_attrs merged with approved (tag, attr) rows,
+    attribute_filter=filt,            # id prefix, u- classes, img /media/ only, no //host
+    url_schemes={'http', 'https', 'mailto'},
+    link_rel='noopener noreferrer',
+    strip_comments=True,
+)
+filt('p', 'id', 'x')                                -> 'user-content-x'
+filt('p', 'class', 'u-note admin-banner')           -> 'u-note'
+filt('img', 'src', 'https://evil/x.png')            -> None   (attribute removed)
+filt('img', 'src', '/media/ab/cd/x/full.webp')      -> unchanged
+filt('a', 'href', '//evil.example')                 -> None</pre>
+<p>Results of the exact calls above: <code>&lt;p id="x" class="u-note admin-banner"&gt;</code> became <code>&lt;p id="user-content-x" class="u-note"&gt;</code>; the external image lost its <code>src</code>; the <code>/media/</code> image stayed; the protocol-relative link lost its <code>href</code>; <code>mailto:</code> and <code>/wiki/x</code> stayed.</p>
+
+<h2>Details for RND.3</h2>
+<ul>
+<li><strong>nofollow on external links only.</strong> nh3's <code>link_rel</code> applies to every link, including internal wiki links, where <code>nofollow</code> is wrong for search engines (<a href="seo.html">SEO</a>). Set <code>link_rel</code> to <code>noopener</code> only, and let a Markdown tree processor add <code>rel="nofollow ugc"</code> to external links before sanitising (allow the <code>rel</code> attribute on <code>a</code> with a filter that only accepts those tokens).</li>
+<li><strong>Footnotes</strong> need <code>id</code>, <code>href</code> and the classes <code>footnote-ref</code>, <code>footnote-backref</code>: add these as baseline <code>u-</code>-style exceptions or rename them in a Markdown extension; do not open <code>class</code> in general.</li>
+<li><strong>Table alignment</strong> arrives as <code>style="text-align:right"</code>; convert to a class before sanitising (see <a href="markdown-rendering.html">RES.1</a>); the sanitiser strips every <code>style</code> attribute.</li>
+<li><strong>Order matters:</strong> sanitise after Markdown and before inserting trusted markup (maths, media players). The renderer's own output is never passed through the sanitiser again, and author text is never concatenated into it unescaped.</li>
+<li><strong>Test set:</strong> keep the 23 inputs as a regression test, and add tests for every approved tag. The inputs are in <code>docs/research/poc/sanitiser_vectors.py</code> (it also prints the speed comparison); they belong in the test suite (TST.1).</li>
+<li><strong>Defence in depth:</strong> the CSP (<code>default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'</code>) is the second wall; verified in Chromium 141 that inline scripts and inline style attributes are refused (see the <a href="front-end.html">front-end page</a>). The sanitiser is the first.</li>
+</ul>
+
+<h2>Alternatives considered</h2>
+<table><tr><th>Option</th><th>Notes</th></tr>
+<tr><td>bleach 6.4.0 (Apache-2.0, released 2026-06-05)</td><td>Pure Python, still releasing, now depends only on <code>webencodings</code>. 30 times slower and leaves script text behind. Mozilla announced it deprecated in January 2023 (from memory; the current PyPI description does not say so and I could not verify the announcement), another reason not to start a new project on it.</td></tr>
+<tr><td>Own sanitiser (html.parser or lxml)</td><td>Rejected: sanitising HTML correctly (mutation XSS, parser differences) is the thing libraries exist for.</td></tr>
+<tr><td>DOMPurify</td><td>JavaScript; would need Node and a DOM implementation on the server. Rejected.</td></tr>
+<tr><td>Escape all HTML (Markdown <code>safe_mode</code>)</td><td>Python-Markdown removed safe mode; and the requirement is an admin-approved allowlist, not zero HTML.</td></tr>
+</table>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>nh3's behaviour on mutation-XSS vectors beyond the 23 tested; it tracks the Rust ammonia crate, whose advisories should be followed (the daily <code>pip-audit</code> job from <a href="platform-conventions.html">platform conventions</a> covers nh3 releases).</li>
+<li>The bleach deprecation notice (see table).</li>
+</ul>
+</main></body></html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.2 Server-side LaTeX math - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.2: Server-side LaTeX math</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks RND.2; touches RND.4 (CSP), RND.5 (cache) and UI.14. Experiments on Ubuntu 24.04.5 with Chromium 141 (Playwright) for the browser checks.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Render LaTeX to MathML with Temml 0.14.0</strong> (MIT, by the KaTeX author) in a small Node batch script, called once per page render with every formula on the page. Output is MathML Core with no fonts, no script and almost no inline style, so it fits the strict CSP and inherits text colour (dark mode works with no extra work).</li>
+<li><strong>Node.js is a runtime dependency only for this.</strong> Ubuntu 24.04's <code>nodejs</code> package is 18.19.1; Temml needs 18.13 or newer. Vendor <code>temml.min.js</code> (164 KB) in the repository so no <code>npm install</code> is needed on the server. If Node is missing or fails, the page still renders: the formula is shown as escaped TeX in a <code>&lt;code class="math-error"&gt;</code> element and the failure is logged. Whether a Node runtime is acceptable overlaps RES.22 (owned by Research C); see the decision below.</li>
+<li><strong>The renderer's output is trusted markup inserted after sanitising</strong>, never author HTML. Author text only ever reaches Temml as a TeX string, with <code>trust: false</code>, <code>maxExpand: 1000</code>, and an error (not a guess) on bad input.</li>
+<li>Add one small CSS file (Temml's <code>Temml-Local.css</code>, 12 KB, MIT) served from our origin, and optionally the Latin Modern Math webfont for identical look across browsers. Both are same-origin, so <code>style-src 'self'; font-src 'self'</code> covers them.</li>
+<li>Delimiters accepted: <code>\\( ... \\)</code>, <code>\\[ ... \\]</code> and the single-backslash forms (MultiMarkdown writes two). Dollar signs are not math (game text uses prices and dice, for example "$5"). The Markdown parser never sees the TeX: the prototype hides each formula behind an inert token and swaps the MathML in after sanitising.</li>
+</ul>
+
+<h2>Options measured</h2>
+<table><tr><th>Option</th><th>Licence and version</th><th>Output</th><th>Speed</th><th>Verdict</th></tr>
+<tr><td><strong>Temml</strong> (Node)</td><td>MIT, 0.14.0 (npm, current)</td><td>MathML Core. Only a few <code>style</code> attributes: <code>display:block math</code> on display math (already covered by the shipped CSS class) and cell padding on matrices.</td><td>0.07 ms per formula once loaded; 68 ms for a batch of 20 including starting Node</td><td><strong>Chosen.</strong> Real parse errors; handles <code>aligned</code>, <code>cases</code>, matrices, <code>\ce</code>.</td></tr>
+<tr><td>KaTeX (Node), HTML + MathML output</td><td>MIT, 0.19.0 (npm); apt <code>katex</code> is 0.16.10 and depends on <code>libjs-katex</code> and node-commander</td><td>Visually best, but 57 inline <code>style</code> attributes for one display formula (a sum plus a matrix): <strong>blocked by our CSP</strong> (no inline styles). Needs 20+ font files and CSS.</td><td>0.25 ms per formula</td><td>Rejected: CSP and weight.</td></tr>
+<tr><td>KaTeX, MathML only</td><td>same</td><td>0 inline styles, MathML only, but the wrapper span and semantics annotation are kept</td><td>same</td><td>Works; Temml gives equal output with fewer bytes and matrices handled better.</td></tr>
+<tr><td>latex2mathml (pure Python)</td><td>MIT, 3.81.1 (PyPI, 2026-09-07)</td><td>MathML, no inline styles</td><td>0.3 ms per formula, in-process</td><td>Rejected as the main renderer: it does not report errors. Unknown commands become text (<code>\ce{H2O}</code> and <code>\unknowncmd{x}</code> printed as <code>&lt;mi&gt;\ce&lt;/mi&gt;</code>), the <code>&amp;</code> in <code>aligned</code> is emitted as a raw <code>&lt;mi&gt;&amp;&lt;/mi&gt;</code>, and <code>\href{javascript:...}</code> becomes <code>&lt;mrow href="javascript:..."&gt;</code>. It is usable only with a strict output check (see fallback).</td></tr>
+<tr><td>pandoc <code>--mathml</code></td><td>3.1.3 (apt)</td><td>MathML with <code>style</code> attributes on table cells</td><td>about 130 ms per call</td><td>Rejected: slow, per-call process, style attributes.</td></tr>
+<tr><td>MathJax (client or server)</td><td>apt <code>libjs-mathjax</code> 2.7.9 (very old); v3/v4 not measured</td><td>needs client script or heavy Node renderer</td><td>not measured</td><td>Rejected by the "no client script" rule.</td></tr>
+<tr><td>Real LaTeX (<code>texlive</code>)</td><td>apt</td><td>images (dvisvgm)</td><td>seconds per formula</td><td>Rejected: installs a TeX distribution and runs arbitrary TeX.</td></tr>
+</table>
+<p>A 14-formula coverage test (aligned, cases, blackboard bold, <code>\operatorname</code>, binomials, nth roots, vectors, overlines, <code>\text</code> mixed with maths, calligraphic, <code>\dfrac</code>, norms, a damage formula) rendered without error in KaTeX and Temml; the only failure was <code>\ce{H2O}</code> in KaTeX (needs an extension there, supported by Temml).</p>
+
+<h2>Security checks</h2>
+<ul>
+<li>With <code>trust</code> false, Temml and KaTeX never emit an <code>href</code> for <code>\href{javascript:alert(1)}{x}</code>: both print the command name in an error colour and the arguments as plain math symbols (the error colour is an inline style, stripped server-side). <code>\includegraphics</code> gave an error element in Temml.</li>
+<li>A recursive macro (<code>\def\a{\a\a}\a</code>) returned an error in KaTeX and Temml thanks to <code>maxExpand</code>; latex2mathml stopped with a RecursionError at depth 100.</li>
+<li>Browser test (Chromium 141) with <code>script-src 'self'; style-src 'self'</code>: Temml's MathML rendered correctly in light and dark colour schemes, display math stayed <code>display:block</code> from the CSS class although the style attribute was refused, and matrices only lost their small cell padding. Add <code>mtd { padding: 0 .4em }</code> to the shipped CSS and strip the <code>style</code> attributes server-side (the prototype does) so the console stays free of CSP violations.</li>
+<li>The renderer runs on the worker or in the web process with a timeout (the prototype uses 10 s) and a size cap on the input (suggested: 2,000 characters per formula, 200 formulas per page).</li>
+</ul>
+
+<h2>Browser support</h2>
+<p>MathML Core renders natively in current Chrome and Edge (109 and newer), Firefox and Safari; that is stated from general knowledge and from the Chromium 141 run here, not from a compatibility database (the sites hosting one were not reachable from this session). Older browsers show the plain text content of the formula. Because this is a game database and not a mathematics site, that is acceptable; the editor guide (DOC.4) mentions it.</p>
+
+<h2>Pipeline and cost</h2>
+<p>Parse Markdown, sanitise, then replace tokens with MathML (see <a href="markdown-rendering.html">RES.1</a> and <a href="html-sanitising.html">RES.3</a>). Starting Node costs about 60 ms per page that contains formulas, paid only on a cache miss: pages are cached by revision (<a href="caching.html">caching</a>), so each revision pays once. The preview endpoint (RND.6) pays it on every preview of a page with math; if that is felt, keep one long-lived Node process on a local socket (not planned for 1.0). Prototype files: <code>docs/research/poc/math_batch.js</code> and <code>render_poc.py</code>.</p>
+
+<h2>Fallback if Node is not accepted</h2>
+<p>Use latex2mathml with guards: reject any output containing a backslash token in an <code>&lt;mi&gt;</code>, a raw ampersand or an <code>href</code> attribute, and show the TeX source for rejected formulas. Everything except simple formulas (no <code>aligned</code>, no <code>\ce</code>) would show as source. Acceptable for 1.0 if Node is ruled out; a worse editor experience.</p>
+
+<h2>Decision for the owner</h2>
+<div class="q"><p><strong>Question:</strong> may the server run Node.js (Ubuntu's <code>nodejs</code> package) at runtime only to render maths?</p>
+<p>Options: (a) <strong>Yes, Temml via Node, recommended</strong>: best output, real errors, safe; adds one apt package and one vendored file, and degrades to TeX source if Node is missing. (b) No Node: latex2mathml with guards; pure Python, simple formulas only. Default taken: (a), pending RES.22 (build-time Node) from Research C; switching to (b) later only changes RND.2.</p></div>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>MathML browser support tables (hosts blocked); Safari behaviour was not tested.</li>
+<li>Whether Node 18.19 (Ubuntu) and Node 22 (used here) render identically: only Node 22 was run. Temml declares <code>node &gt;= 18.13</code>.</li>
+</ul>
+</main></body></html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research index - spakr</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="../plan/questions.html">Open questions</a><a href="index.html">Research index</a></nav><main>
+<h1>Research index</h1>
+<p>One page per research item (RES.n in <a href="https://github.com/dwhagar/spakr/blob/main/TODO.md">TODO.md</a>). Each page has a recommendation, the measurements behind it, and what could not be verified. Decisions are summarised on <a href="../plan/questions.html">open questions and defaults</a>.</p>
+<h2>Content side (thread A)</h2>
+<table><tr><th>Item</th><th>Page</th><th>Recommendation in one line</th></tr>
+<tr><td>RES.1</td><td><a href="markdown-rendering.html">Markdown and MultiMarkdown</a></td><td>Python-Markdown with MMD-style extensions and YAML front matter; no true MultiMarkdown engine exists for Ubuntu 24.04.</td></tr>
+<tr><td>RES.2</td><td><a href="math-rendering.html">Server-side math</a></td><td>Temml to MathML in a vendored Node batch script; strict CSP safe, falls back to TeX source.</td></tr>
+<tr><td>RES.3</td><td><a href="html-sanitising.html">HTML sanitiser</a></td><td>nh3; fixed Markdown baseline plus admin-approved tags; 30 times faster than bleach.</td></tr>
+<tr><td>RES.4</td><td><a href="git-content-store.html">Git store</a></td><td>git binary by subprocess, one repository, all writes under flock.</td></tr>
+<tr><td>RES.7</td><td><a href="search.html">Search</a></td><td>InnoDB FULLTEXT with min token size 2 and stopwords off as install requirements; title-boosted ranking.</td></tr>
+<tr><td>RES.8</td><td><a href="seo.html">SEO</a></td><td>No library; canonical from configuration, JSON-LD, sitemap index, noindex by header.</td></tr>
+<tr><td>RES.10</td><td><a href="media-tools.html">Media tools</a></td><td>ImageMagick under a tight policy file, ffmpeg with a protocol whitelist, limits by cgroup.</td></tr>
+<tr><td>RES.11</td><td><a href="front-end.html">Front end and CSP</a></td><td>Server-rendered pages, native ES modules, strict CSP from day one, CSS-variable themes.</td></tr>
+<tr><td>RES.25</td><td><a href="caching.html">Caching</a></td><td>Content-keyed render cache: per-process LRU plus disk files, no invalidation needed.</td></tr>
+<tr><td>(earlier)</td><td><a href="media-processing.html">Media processing</a></td><td>Background note the media pages build on.</td></tr>
+</table>
+<h2>Platform side (thread B)</h2>
+<table><tr><th>Item</th><th>Page</th></tr>
+<tr><td>RES.5</td><td><a href="auth-sessions.html">Passwords, sessions, CSRF, API keys</a></td></tr>
+<tr><td>RES.6</td><td><a href="email.html">Email through an SMTP relay</a></td></tr>
+<tr><td>RES.9</td><td><a href="uploads.html">Upload safety</a></td></tr>
+<tr><td>RES.12</td><td><a href="rate-limiting.html">Rate limiting</a></td></tr>
+<tr><td>RES.14</td><td><a href="openapi.html">OpenAPI</a></td></tr>
+<tr><td>RES.15</td><td><a href="packaging.html">Packaging</a></td></tr>
+<tr><td>RES.16</td><td><a href="apache-hosting.html">Apache hosting</a></td></tr>
+<tr><td>RES.17</td><td><a href="backups.html">Backups</a></td></tr>
+<tr><td>RES.18</td><td><a href="accessibility.html">Accessibility</a></td></tr>
+<tr><td>RES.20</td><td><a href="settings-config.html">Settings and secrets</a></td></tr>
+<tr><td>(conventions)</td><td><a href="platform-conventions.html">Queue, logging, MySQL, testing, privacy</a></td></tr>
+</table>
+<p>Not yet researched: RES.13 (entity fields), RES.19 (import and export), RES.21 to RES.24 (web UI layer, Research C).</p>
+<h2>Experiments and prototypes</h2>
+<p>Small scripts used for the content-side findings live in <code>docs/research/poc/</code>: <code>render_poc.py</code> and <code>math_batch.js</code> (Markdown, sanitiser and maths pipeline), <code>sanitiser_vectors.py</code> (23 hostile inputs against nh3 and bleach) and <code>sample.md</code>. The ImageMagick policy tested on the media page is <code>examples/imagemagick-policy.xml</code>.</p>
+</main></body></html>
