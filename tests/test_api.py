@@ -208,6 +208,15 @@ def test_database_versions_unreachable(monkeypatch):
     assert (current, state) == (None, "unavailable")
 
 
+def test_health_uses_the_real_integration(client, monkeypatch):
+    monkeypatch.setattr(integration, "database_versions", _REAL_DATABASE_VERSIONS)
+    monkeypatch.setattr(integration, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(integration, "create_db_engine", lambda settings: object())
+    monkeypatch.setattr(integration, "get_schema_version", lambda engine: 1)
+    body = client.get("/api/v1/health").get_json()
+    assert body["database_version"] == {"expected": 2, "current": 1, "state": "needs-upgrade"}
+
+
 def test_health_not_ok_when_database_needs_upgrade(client, monkeypatch):
     monkeypatch.setattr(integration, "database_versions", lambda c: (3, 2, "needs-upgrade"))
     response = client.get("/api/v1/health")
