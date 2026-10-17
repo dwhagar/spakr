@@ -31,6 +31,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 - [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
+- [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
 ## FND: Foundation
 
@@ -46,7 +47,8 @@ Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 - [ ] **FND.8** Structured logging [0.1] — needs: FND.1, FND.2
 - [ ] **FND.9** Command-line tool (spakr): init-config, init-db, create-admin, reindex, load-sample, backup, restore, requeue-stuck, version [0.1] — needs: FND.2, DB.1
 - [x] **FND.10** Python 3.12 required: `requires-python >=3.12` in pyproject and a clear startup error on older versions [0.1] — needs: FND.1
-- [ ] **FND.11** Data directory `/data` in the project root: all data (content repository, media, originals, cache) lives under it, it is git-ignored, created and checked at startup [0.1] — needs: FND.2, CFG.2
+- [ ] **FND.11** Data directory `/data` (git-ignored): holds the articles (content repository) and the system's data (media, originals, uploads, cache) and nothing else; never config.json, examples or docs; created and checked at startup [0.1] — needs: FND.2, CFG.2
+- [ ] **FND.12** Layout fix: config.json lives in the project root (search order: --config, SPAKR_CONFIG, ./config.json, /etc/spakr/config.json; drop the data-directory fallback), /data holds only articles and system data, examples/ and docs/ stay outside it; update the loader, paths, tests and docs [0.1] — needs: FND.2, FND.11
 
 ## API: API (Flask, /api/v1)
 
@@ -97,7 +99,7 @@ Issue: [#14](https://github.com/dwhagar/spakr/issues/14)
 Issue: [#15](https://github.com/dwhagar/spakr/issues/15)
 
 - [ ] **RND.1** MultiMarkdown rendering [0.3] — needs: FND.1, RES.1
-- [ ] **RND.2** LaTeX math rendered server-side to static markup [0.3] — needs: RND.1, RES.2
+- [ ] **RND.2** LaTeX math rendered server-side to MathML with pure-Python latex2mathml (no Node): aligned rewrite, 2,000-character cap, output guard (unknown commands, href, javascript, exceptions) and escaped TeX-source fallback [0.3] — needs: RND.1, RES.2
 - [ ] **RND.3** HTML sanitiser with the admin-approved allowlist [0.3] — needs: RND.1, RES.3
 - [ ] **RND.4** Strict Content-Security-Policy and security headers (no inline script or style) [0.3] — needs: API.1, UI.1
 - [ ] **RND.5** Rendered-page cache keyed by content (commit, render version, allowlist version) [0.3] — needs: RND.1, GIT.2, RES.25
@@ -182,7 +184,7 @@ Issue: [#21](https://github.com/dwhagar/spakr/issues/21)
 - [ ] **SEARCH.9** SEO metadata, sitemap.xml and robots.txt [0.6] — needs: GIT.5, VIS.2, RES.8
 - [ ] **SEARCH.10** Per-process memory (LRU) and disk caches for rendered pages, size cap, no Redis for it [0.6] — needs: RND.5, QUE.1, RES.25
 
-## MED: Uploads and media
+## MED: Uploads and media management
 
 Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 
@@ -196,6 +198,25 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.8** Admin purge of originals [0.7] — needs: MED.3, AUTH.3
 - [ ] **MED.9** Optional ClamAV scan of uploads (off by default, admin switch, clamdscan or INSTREAM socket) [0.7] — needs: MED.3, QUE.2
 - [ ] **MED.10** Optional WebVTT captions per video and transcript link per audio file; renderer emits track elements [0.7] — needs: MED.7
+- [ ] **MED.11** Media records and metadata: stable media id, title, description, alt text, credit and source, licence, tags, setting, uploader, content hash, sizes; metadata editing through the API and revisioned in the audit log [0.7] — needs: MED.3, DB.2, AUTH.7
+- [ ] **MED.12** Usage index: which pages reference each file (current revision and history), updated on every page save, rebuild command, orphan detection [0.7] — needs: MED.7, GIT.2, MED.11
+- [ ] **MED.13** Media library API: list, search, filter (type, setting, tag, uploader, visibility, orphaned, status) and sort with pagination; metadata read and patch [0.7] — needs: MED.11, API.4, VIS.2
+- [ ] **MED.14** Per-file visibility (public or GM-only) enforced in file serving, library, search, embeds and downloads, with leak tests [0.7] — needs: MED.11, VIS.2
+- [ ] **MED.15** Replace, re-process and rename without breaking embeds: embeds refer to the stable media id, old URLs redirect, replaced versions are kept as old versions until pruned [0.7] — needs: MED.11, MED.12, MED.6
+- [ ] **MED.16** Variants view and regeneration: list variants of a file, regenerate one or all as queue tasks [0.7] — needs: MED.6, MED.11
+- [ ] **MED.17** Moderation and approval queue: editor uploads wait as pending, moderators approve or reject with a reason, pending files are never served publicly [0.7] — needs: MED.2, MED.11, AUTH.3
+- [ ] **MED.18** Duplicate detection by content hash at upload and in a library report, with merge of duplicates that rewrites embeds through the media id [0.7] — needs: MED.3, MED.12
+- [ ] **MED.19** Bulk actions API: tag, set setting or visibility, delete, purge originals; run as queue tasks, one audit entry per action [0.7] — needs: MED.13, MED.8, QUE.2
+- [ ] **MED.20** Storage statistics and quota: usage by type, user and setting, admin quota settings enforced at upload [0.7] — needs: MED.11, CFG.4
+- [ ] **MED.21** Copyright and removal handling: takedown hides a file at once, removes originals and variants, leaves a tombstone and an audit entry; removal contact from COPYRIGHT.md is shown on the media page [0.7] — needs: MED.8, MED.14, AUTH.7
+- [ ] **MED.22** Media permissions and API-key scopes: view, upload, edit own, edit any, moderate, delete, purge originals, prune [0.7] — needs: AUTH.3, API.4
+- [ ] **MED.23** Prune policy (decide and record in docs/design/media.html): a file is in use when the current revision of any page references it; references only in git history count while the admin setting `media.history_counts` is on (default on) and are released otherwise; replaced versions and stale variants have a retention period; originals follow the admin purge policy; default grace period 30 days [0.7] — needs: MED.12, MED.8
+- [ ] **MED.24** Locking: one lock shared by uploads, replace, regenerate and prune so prune never runs against an upload, and every deletion re-checks references under the lock [0.7] — needs: MED.3, QUE.2
+- [ ] **MED.25** prune-media core: finds unreferenced media, old versions and stale variants; dry-run by default with a report; marks candidates and deletes only after the grace period; never deletes anything still referenced [0.7] — needs: MED.23, MED.24, MED.12
+- [ ] **MED.26** scripts/prune-media command (--apply, --grace, --json report) writing one audit entry per run with counts and bytes freed [0.7] — needs: MED.25, AUTH.7
+- [ ] **MED.27** systemd service and timer for prune-media in examples/ (runs as the app user, nice and ionice, dry-run unless apply is enabled in settings) with install notes in the admin guide [0.7] — needs: MED.26, FND.6
+- [ ] **MED.28** Admin prune API: trigger a run, view status, last report and history, edit prune settings [0.7] — needs: MED.26, API.4, AUTH.8
+- [ ] **MED.29** Media suite tests: prune never deletes referenced or history-held files, grace period, lock against concurrent upload, replace keeps embeds, visibility and takedown leak tests [0.7] — needs: MED.25, MED.15, MED.21, MED.14
 
 ## UI: Web UI (first-party JavaScript client)
 
@@ -220,15 +241,19 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.17** Asset tooling in Python: scripts/hash-assets, make-icons and check-contrast, THIRD-PARTY.md for vendored files, and per-page size budgets checked in the daily run [0.1] — needs: UI.1, FND.7
 - [ ] **UI.18** Web app manifest and icons so the site can be installed; no service worker in 1.0 [0.8] — needs: UI.2
 - [ ] **UI.19** Search-as-you-type combobox and the editor link picker (progressive ARIA combobox over the autocomplete endpoint) [0.8] — needs: UI.6, SEARCH.7
+- [ ] **UI.20** Media library screens: browse as grid or list, search, filter, sort, select several; responsive and themed [0.8] — needs: UI.8, UI.13, MED.13
+- [ ] **UI.21** Media detail screen: metadata editor, usage list, variants view and regeneration, replace and rename, visibility, takedown [0.8] — needs: UI.20, MED.12, MED.15, MED.16, MED.21
+- [ ] **UI.22** Media moderation queue and bulk-action screens [0.8] — needs: UI.20, MED.17, MED.19
+- [ ] **UI.23** Admin media screens: storage statistics and quota, duplicates report, prune settings, trigger and status of prune runs [0.8] — needs: UI.20, MED.18, MED.20, MED.28
 
 ## OPS: Hardening and operations
 
 Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 
-- [ ] **OPS.1** Security review [0.9] — needs: UI.7, UI.8, CFG.7, SEARCH.6, VIS.3
+- [ ] **OPS.1** Security review [0.9] — needs: UI.7, UI.8, CFG.7, SEARCH.6, VIS.3, MED.14, MED.21
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
-- [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, RES.18, UI.13
+- [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, UI.21, RES.18, UI.13
 - [ ] **OPS.5** Backup and restore commands (spakr backup, spakr restore) covering git store, MySQL and media [0.9] — needs: DB.4, GIT.1, MED.3, RES.17
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
@@ -238,7 +263,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 
 - [x] **RES.1** MultiMarkdown options: libmultimarkdown vs Python-Markdown extensions vs pandoc; what Ubuntu 24.04 ships [0.0]
-- [x] **RES.2** Server-side LaTeX math: KaTeX, MathJax, latex2mathml or pandoc; static markup, no client script [0.0]
+- [x] **RES.2** Server-side LaTeX math (decided: no Node anywhere): pure-Python latex2mathml (MIT) behind guards, TeX-source fallback; static markup, no client script [0.0]
 - [x] **RES.3** HTML sanitiser library (nh3, bleach or own) and how the admin allowlist maps onto it [0.0]
 - [x] **RES.4** Git access from Python: GitPython, dulwich or the git binary via subprocess; locking and speed [0.0]
 - [x] **RES.5** Password hashing, sessions and CSRF: argon2-cffi and Flask extensions versus own code [0.0]

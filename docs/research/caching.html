@@ -13,21 +13,21 @@
 <li><strong>In-memory layer:</strong> a bounded LRU (for example <code>cachetools.LRUCache</code>, MIT, or a small <code>OrderedDict</code>) of the last 200 rendered bodies per web process (about 20 KB each, so a few MB per process). It removes even the file read for hot pages such as the home page.</li>
 <li><strong>Cache what is the same for every viewer, and nothing that depends on the user.</strong> The cached unit is the sanitised body fragment. The page shell (menus, login state, theme) is rendered fresh per request; it is cheap. A cached fragment is never shared across visibility levels because in 1.0 visibility is per page, not per block.</li>
 <li><strong>Link status is resolved after the cache, in one batch pass.</strong> Wiki links in the cached fragment are stored as plain <code>&lt;a class="wikilink" href="/wiki/slug"&gt;</code>. At response time one SQL query asks which of those slugs exist and are visible to this viewer, and a regular-expression pass marks missing ones (red links) and unwraps links to GM-only pages for readers without the GM role. Measured: 33 microseconds for 60 links on a 15 KB fragment, plus one indexed query. This keeps the cache valid when a target page is created, renamed, deleted or hidden, and cannot leak a hidden page's name through the cache (VIS.3).</li>
-<li><strong>Stampedes:</strong> on a miss, take a per-key lock (an exclusive <code>flock</code> on <code>cache/locks/&lt;key-prefix&gt;</code>), re-check the file, render, write, release. Concurrent readers of a new page wait for one render instead of all running Node for the maths.</li>
+<li><strong>Stampedes:</strong> on a miss, take a per-key lock (an exclusive <code>flock</code> on <code>cache/locks/&lt;key-prefix&gt;</code>), re-check the file, render, write, release. Concurrent readers of a new page wait for one render instead of all rendering the maths.</li>
 <li><strong>Size limit and eviction:</strong> an admin setting, default 256 MB for the render cache. A scheduled queue job (QUE.4) deletes the oldest files by modification time beyond the cap. Files are tiny: the 9.7 KB sample page; 50,000 such pages would be about 0.5 GB, hence a cap, not a promise of everything cached.</li>
 <li><strong>Warm-up:</strong> after a version bump (release, allowlist approval) the queue job re-renders the most-viewed and most recently edited pages first (QUE.4); the rest render on demand.</li>
 <li><strong>HTTP caching sits on top:</strong> the same key is the page's <code>ETag</code>; conditional requests answer 304 without even reading the cache. Rules for <code>Cache-Control</code> and GM-only pages are on the <a href="seo.html">SEO page</a>. Apache's <code>mod_cache</code> is not recommended for 1.0: invalidation and the risk of serving a GM page from a shared cache outweigh the gain.</li>
 </ul>
 
 <h2>Measurements</h2>
-<p>Rendered sample page of 9.7 KB (the sample document repeated 10 times, Markdown then sanitised). Mean over 2,000 runs (200 for rendering, 20 for the Node run).</p>
+<p>Rendered sample page of 9.7 KB (the sample document repeated 10 times, Markdown then sanitised). Mean over 2,000 runs (200 for rendering).</p>
 <table><tr><th>Operation</th><th>Time</th></tr>
 <tr><td>In-process LRU dictionary lookup</td><td>0.2 microseconds</td></tr>
 <tr><td>Read a file from disk, warm in the operating system's cache</td><td>5.3 microseconds</td></tr>
 <tr><td>Redis <code>GET</code> over TCP on localhost</td><td>110 microseconds</td></tr>
 <tr><td>MySQL <code>SELECT</code> of the blob by primary key</td><td>247 microseconds</td></tr>
 <tr><td>Render on a miss: Markdown and sanitiser, no maths</td><td>13.3 ms</td></tr>
-<tr><td>Render on a miss with maths: add Node start and 20 formulas</td><td>about 60 to 70 ms more (Node start plus 20 formulas, see <a href="math-rendering.html">RES.2</a>)</td></tr>
+<tr><td>Render on a miss with maths: add 20 formulas</td><td>a few ms more (pure Python, 20 formulas, see <a href="math-rendering.html">RES.2</a>)</td></tr>
 <tr><td>Link status pass (60 links) after the cache</td><td>33 microseconds, plus one indexed query</td></tr>
 </table>
 <p>Every cache layer is more than 50 times cheaper than rendering, and all of them are far below the cost of the rest of a request (database, templates), so the choice among them is about simplicity, not speed. Files and memory need no extra service, survive or rebuild trivially, and make Redis outages irrelevant to page reads. The MySQL row is the worst of the four and would also bloat backups.</p>

@@ -17,7 +17,7 @@
 <li>Extract math spans so they are not mangled by Markdown.</li>
 <li>Render with Python-Markdown and MultiMarkdown-style extensions (tables, footnotes, definition lists, abbreviations, sub/superscript, wiki links); structured data in YAML front matter. No true MultiMarkdown engine (<a href="../research/markdown-rendering.html">RES.1</a>).</li>
 <li>Sanitise the HTML against the allowlist (parse, drop anything not approved, never regex).</li>
-<li>Typeset math: server-side to MathML with Temml, no client script and no inline style (<a href="../research/math-rendering.html">RES.2</a>); sanitise first, then insert the trusted math markup (<a href="../research/html-sanitising.html">RES.3</a>).</li>
+<li>Typeset math: server-side to MathML with latex2mathml (pure Python, no Node), no client script and no inline style (<a href="../research/math-rendering.html">RES.2</a>); sanitise first, then insert the trusted math markup (<a href="../research/html-sanitising.html">RES.3</a>).</li>
 <li>Cache the result keyed by commit hash; the worker invalidates on change.</li>
 </ol>
 <p>The site sends a strict <code>Content-Security-Policy</code> with no inline script or style, as a second line of defence.</p>

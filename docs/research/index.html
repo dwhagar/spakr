@@ -7,7 +7,7 @@
 <h2>Content side (thread A)</h2>
 <table><tr><th>Item</th><th>Page</th><th>Recommendation in one line</th></tr>
 <tr><td>RES.1</td><td><a href="markdown-rendering.html">Markdown and MultiMarkdown</a></td><td>Python-Markdown with MMD-style extensions and YAML front matter; no true MultiMarkdown engine exists for Ubuntu 24.04.</td></tr>
-<tr><td>RES.2</td><td><a href="math-rendering.html">Server-side math</a></td><td>Temml to MathML in a vendored Node batch script; strict CSP safe, falls back to TeX source.</td></tr>
+<tr><td>RES.2</td><td><a href="math-rendering.html">Server-side math</a></td><td>latex2mathml to MathML in pure Python behind guards (no Node, decided); strict CSP safe, falls back to TeX source.</td></tr>
 <tr><td>RES.3</td><td><a href="html-sanitising.html">HTML sanitiser</a></td><td>nh3; fixed Markdown baseline plus admin-approved tags; 30 times faster than bleach.</td></tr>
 <tr><td>RES.4</td><td><a href="git-content-store.html">Git store</a></td><td>git binary by subprocess, one repository, all writes under flock.</td></tr>
 <tr><td>RES.7</td><td><a href="search.html">Search</a></td><td>InnoDB FULLTEXT with min token size 2 and stopwords off as install requirements; title-boosted ranking.</td></tr>
@@ -33,5 +33,5 @@
 </table>
 <p>Not yet researched: RES.13 (entity fields), RES.19 (import and export), RES.21 to RES.24 (web UI layer, Research C).</p>
 <h2>Experiments and prototypes</h2>
-<p>Small scripts used for the content-side findings live in <code>docs/research/poc/</code>: <code>render_poc.py</code> and <code>math_batch.js</code> (Markdown, sanitiser and maths pipeline), <code>sanitiser_vectors.py</code> (23 hostile inputs against nh3 and bleach) and <code>sample.md</code>. The ImageMagick policy tested on the media page is <code>examples/imagemagick-policy.xml</code>.</p>
+<p>Small scripts used for the content-side findings live in <code>docs/research/poc/</code>: <code>render_poc.py</code> and <code>math_poc.py</code> (Markdown, sanitiser and maths pipeline), <code>sanitiser_vectors.py</code> (23 hostile inputs against nh3 and bleach) and <code>sample.md</code>. The ImageMagick policy tested on the media page is <code>examples/imagemagick-policy.xml</code>.</p>
 </main></body></html>

@@ -14,7 +14,7 @@
 <tr><td>Queue</td><td>Redis, with a Python worker (RQ or a small in-house consumer; default RQ)</td></tr>
 <tr><td>Media</td><td>ffmpeg and ImageMagick run in the worker as sandboxed subprocesses; Python libraries are listed in <a href="../research/media-processing.html">research</a></td></tr>
 <tr><td>Revisions</td><td>git repository on disk, driven by the <code>git</code> binary</td></tr>
-<tr><td>Markdown</td><td>Python-Markdown 3.x in-process with MultiMarkdown-style extensions, then nh3 sanitising; maths by Temml in a small Node batch script (<a href="../research/markdown-rendering.html">RES.1</a>, <a href="../research/math-rendering.html">RES.2</a>)</td></tr>
+<tr><td>Markdown</td><td>Python-Markdown 3.x in-process with MultiMarkdown-style extensions, then nh3 sanitising; maths by latex2mathml (pure Python, no Node) (<a href="../research/markdown-rendering.html">RES.1</a>, <a href="../research/math-rendering.html">RES.2</a>)</td></tr>
 </table>
 <h2>Process model</h2>
 <ul>
