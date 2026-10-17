@@ -10,6 +10,7 @@ from typing import Any
 from spakr.config import ConfigError, Settings, load_settings
 
 log = logging.getLogger("spakr.api")
+_ENGINES: dict[int, Any] = {}  # one database engine per loaded configuration
 
 
 def load_config() -> tuple[Settings | None, str | None]:
@@ -23,12 +24,15 @@ def load_config() -> tuple[Settings | None, str | None]:
 def database_versions(config: Any) -> tuple[int | None, int | None]:
     """Return (expected, current) database schema version; None when unknown."""
     try:
-        from spakr.db import versions
-    except ImportError:
+        from spakr.db import SCHEMA_VERSION, create_db_engine, get_schema_version
+    except ImportError:  # the database layer has not landed yet
         return None, None
-    expected = getattr(versions, "DB_VERSION", None)
+    expected = SCHEMA_VERSION
     try:
-        current = versions.current_db_version(config)
+        engine = _ENGINES.get(id(config))
+        if engine is None:
+            engine = _ENGINES[id(config)] = create_db_engine(config)
+        current = get_schema_version(engine)
     except Exception:  # database down or not initialised: report, do not crash
         log.warning("could not read the database schema version", exc_info=True)
         current = None
