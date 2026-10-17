@@ -1,0 +1,47 @@
+{
+  "_about": "Copy to config.json (git-ignored, keep mode 0600). Entries marked secret are write-only in the web interface. The database section is manual-only: it can never be changed from the web interface or API.",
+
+  "database": {
+    "_note": "MANUAL ONLY. Not editable from the web interface or API.",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "name": "spakr",
+    "user": "spakr",
+    "password": "CHANGE-ME (secret)"
+  },
+
+  "secrets": {
+    "_note": "Secret options. Editable in the web interface but write-only: the API accepts a new value or a clear, and never returns the stored value.",
+    "secret_key": "CHANGE-ME (secret, long random value)",
+    "mail_password": "",
+    "redis_password": ""
+  },
+
+  "mail": {
+    "_note": "External SMTP relay (never a local MTA). Editable in the web interface.",
+    "host": "smtp.example.org",
+    "port": 587,
+    "tls": "starttls",
+    "username": "relay-user",
+    "sender": "spakr@example.org"
+  },
+
+  "redis": {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "db": 0
+  },
+
+  "paths": {
+    "content_repo": "/srv/spakr/data/content.git",
+    "media": "/srv/spakr/data/media",
+    "media_originals": "/srv/spakr/data/media-originals",
+    "cache": "/srv/spakr/data/cache"
+  },
+
+  "site": {
+    "name": "spakr",
+    "base_url": "https://spakr.example.org",
+    "contact_url": "https://spakr.example.org/contact"
+  }
+}

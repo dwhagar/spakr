@@ -39,6 +39,6 @@ scripts/        maintenance scripts (backup, migrate, reindex)</pre>
   MySQL    git     Redis queue -> worker (ffmpeg, ImageMagick, mail, reindex)</pre>
 <p>The web UI is a first-party JavaScript client that calls the API over HTTP and never bypasses it. Outbound HTTP uses one shared client helper with a standards-compliant User-Agent.</p>
 <h2>Configuration</h2>
-<p>Runtime settings (database credentials, Redis URL, content repo path, upload limits, secret key) live in JSON files outside version control. <code>.gitignore</code> ignores every <code>*.json</code>. Examples are committed as <code>*.json.example</code>. Admin-editable settings live in the database.</p>
+<p>Every option that holds a secret lives in <code>config.json</code> (git-ignored, mode 0600; <code>.gitignore</code> ignores every <code>*.json</code>); the committed example is <code>examples/config.json.example</code>. The MySQL credentials are configured there manually and are never exposed or editable through the API or web interface. Every other setting is changeable in the admin settings screens backed by the API: non-secret settings live in the database, secrets are written to <code>config.json</code> by the app and are write-only (set or unset, never returned or logged).</p>
 
 </main></body></html>

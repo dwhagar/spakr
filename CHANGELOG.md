@@ -4,6 +4,14 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 
 ## [Unreleased]
 
+### Changed
+- Email goes through an external SMTP relay, never a local MTA; relay settings and sender address are configuration (MAIL.1 unblocked, RES.6 reworded).
+- Media: ffmpeg and ImageMagick are the preferred tools; Python libraries allowed where measurably better (RES.10, MED.4).
+- Config: secrets live in `config.json`, everything is editable in the web interface except the MySQL credentials. Admin settings API (AUTH.8) never returns secrets.
+
+### Added
+- CFG category (CFG.1 to CFG.7): config example, settings registry, manual-only MySQL credentials, settings store, secrets handling, live reload, admin settings screens. RES.20 (settings and secrets approach) and MAIL.3 (email settings with test message).
+
 ### Added
 - Standing requirement: every screen is responsive and has light and dark modes from the start. Foundation items UI.11 (responsive layout base), UI.12 (light/dark theme tokens with a user toggle), UI.13 (acceptance checklist for every UI item), UI.14 (themed tables, code and media players), and DOC.6 (plan pages responsive with dark mode, done). Later UI items now need UI.13.
 
