@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment - spakr plan</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<h1>Deployment</h1>
+
+<h2>Packages (Ubuntu LTS)</h2>
+<pre>apt install apache2 libapache2-mod-wsgi-py3 mysql-server redis-server \
+            git python3 python3-venv multimarkdown</pre>
+<p>Enable modules: <code>a2enmod wsgi cgid headers rewrite</code>. If <code>multimarkdown</code> is not packaged for a release, the install script builds it from source.</p>
+<h2>Services</h2>
+<ul>
+<li><code>apache2</code>: serves the WSGI app and CGI scripts.</li>
+<li><code>mysql</code>: database <code>spakr</code> with a dedicated user.</li>
+<li><code>redis-server</code>: bound to localhost, password set.</li>
+<li><code>spakr-worker.service</code>: queue consumer (example unit in <code>examples/</code>).</li>
+</ul>
+<h2>Examples to be provided in <code>examples/</code></h2>
+<ul>
+<li><code>spakr.conf.example</code>: Apache virtual host (WSGI daemon mode, CGI directory, security headers, upload size limit, HTTPS via Let's Encrypt). A draft is included in this repository.</li>
+<li><code>spakr-worker.service.example</code>: systemd unit for the worker.</li>
+<li><code>config.json.example</code>: application configuration (the real <code>config.json</code> is git-ignored).</li>
+</ul>
+<h2>Operations</h2>
+<p>Scripts in <code>scripts/</code> (added from 0.1 onward): database migrate, reindex, backup (MySQL dump plus content git bundle plus uploads), restore.</p>
+
+</main></body></html>

@@ -1,0 +1,8 @@
+body{font-family:system-ui,sans-serif;line-height:1.55;margin:0;color:#1d2330;background:#fafbfc}
+nav{background:#1d2330;padding:.6rem 1rem}nav a{color:#cfe0ff;margin-right:1rem;text-decoration:none}
+main{max-width:56rem;margin:0 auto;padding:1rem 1.25rem 4rem}
+h1,h2,h3{line-height:1.2}table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #cdd3dd;padding:.4rem .6rem;text-align:left;vertical-align:top}th{background:#eef1f6}
+code{background:#eef1f6;padding:0 .25rem;border-radius:3px}pre{background:#eef1f6;padding:.8rem;overflow:auto}
+.tag{display:inline-block;padding:0 .5rem;border-radius:1rem;background:#dbe7ff;font-size:.85rem}
+.q{background:#fff6dd;border-left:4px solid #e0a800;padding:.1rem 1rem;margin:1rem 0}

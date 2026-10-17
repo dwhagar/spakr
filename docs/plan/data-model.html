@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data model - spakr plan</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<h1>Data model</h1>
+
+<p>Every page has a common header (id, slug, type, title, setting tags, summary, created/updated, current git commit) and a Markdown body stored in git. Type-specific fields are stored in the database and mirrored in the page's front matter (MultiMarkdown metadata) so the git copy is self-describing.</p>
+<h2>Entity types</h2>
+<table><tr><th>Type</th><th>Covers</th><th>Typical fields</th></tr>
+<tr><td>Character</td><td>PCs, NPCs, any named person</td><td>race, nation-state, home place, occupation, stats block (free text), affiliations</td></tr>
+<tr><td>Technology / Gear / Item</td><td>tools, weapons, armour, vehicles, software, artifacts</td><td>category, tech level or rarity, cost, weight, requirements, effects</td></tr>
+<tr><td>Place</td><td>planets, nations' territories, countries, cities, houses, oceans, dungeons, rooms: anywhere a character can go</td><td>parent place (tree), place kind, coordinates or map reference</td></tr>
+<tr><td>Magic / Psionics / Spell</td><td>spells, rituals, psionic powers, magical systems</td><td>discipline, level, cost, range, duration, casting requirements</td></tr>
+<tr><td>Special Ability</td><td>innate abilities</td><td>source (race, entity, trait), activation, effects</td></tr>
+<tr><td>Special Skill</td><td>learned skills</td><td>governing attribute, prerequisites, training, effects</td></tr>
+<tr><td>Entity</td><td>named entities such as demons, gods, cosmic horrors, AIs, organisations</td><td>kind, domain, allegiances, worshippers or followers</td></tr>
+<tr><td>Race</td><td>species (not ethnicities)</td><td>traits, abilities granted, home places, lifespan</td></tr>
+<tr><td>Nation-state</td><td>governments and polities</td><td>government form, capital, territory (places), allies and rivals</td></tr>
+<tr><td>Free page</td><td>any other text: lore, rules, session notes</td><td>none beyond the common header</td></tr>
+</table>
+<h2>Settings</h2>
+<p>Each page carries one or more setting tags: <span class="tag">high fantasy</span> <span class="tag">modern / cosmic horror</span> <span class="tag">science fiction</span>. Settings are data, so admins can add more later.</p>
+<h2>Relations</h2>
+<ul>
+<li>Typed links between pages stored in a <code>relation</code> table (from, to, kind, note), for example character <em>member of</em> nation-state, race <em>grants</em> special ability, item <em>requires</em> skill.</li>
+<li>Plain wiki links in the Markdown body are parsed into untyped backlinks.</li>
+<li>Places form a tree through <code>parent_id</code>.</li>
+</ul>
+<h2>Other tables</h2>
+<p>users, roles, sessions, settings, html_allowlist, uploads (hash, mime, state, uploader), page_index (for search), audit_log.</p>
+
+</main></body></html>
