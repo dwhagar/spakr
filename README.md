@@ -35,4 +35,4 @@ pip install -e '.[dev]'
 python -m pytest
 ```
 
-Copy `examples/config.json.example` to `config.json` (mode 0600) and fill in the database section. All runtime data lives under `/data` (git-ignored; set `SPAKR_DATA_DIR` or `paths.data_dir` to move it, for example in tests). `python -m spakr check-config` validates the file.
+Copy `examples/config.json.example` to `config.json` (mode 0600) and fill in the database section. All runtime data lives under `/data` (git-ignored; set `SPAKR_DATA_DIR` or `paths.data_dir` to move it, for example in tests). `python -m spakr check-config` validates the file, `python -m spakr init-db` creates the data folders and applies the database migrations, and `python -m spakr db-version` shows the applied and expected schema versions. To run the database tests against MySQL as well, point `SPAKR_TEST_DATABASE_URL` at a throwaway schema (every table in it is dropped), for example `mysql+pymysql://user:pw@127.0.0.1/spakr_test`.

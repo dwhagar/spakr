@@ -65,11 +65,11 @@ Issue: [#11](https://github.com/dwhagar/spakr/issues/11)
 
 Issue: [#12](https://github.com/dwhagar/spakr/issues/12)
 
-- [ ] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
-- [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1
+- [x] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
+- [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, type tables, page_search, media, html_allowlist, upload_policy
 - [ ] **DB.3** Command to rebuild the MySQL index from the git content store [0.2] — needs: DB.2, GIT.5, SEARCH.2
 - [ ] **DB.4** Database backup and restore script [0.9] — needs: DB.2
-- [ ] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
+- [x] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
 
 ## QUE: Task queue
 

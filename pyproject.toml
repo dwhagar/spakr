@@ -9,7 +9,7 @@ dependencies = [
     "flask>=3.1,<3.2",
     "pydantic>=2.13,<3",
     "spectree>=3.0,<3.1",
-    "SQLAlchemy>=2.0,<2.1",
+    "SQLAlchemy>=2.0,<2.2",
     "PyMySQL>=1.1,<2",
     "alembic>=1.13,<2",
 ]
@@ -32,7 +32,7 @@ version = { attr = "spakr.BASE_VERSION" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-spakr = ["py.typed"]
+spakr = ["py.typed", "db/migrations/*.py", "db/migrations/*.mako", "db/migrations/versions/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

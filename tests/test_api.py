@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from spectree import Response
 
 from spakr import outbound
-from spakr.api import API_VERSION, create_app
+from spakr.api import API_VERSION, create_app, integration
 from spakr.version import software_version
 
 VALID_CONFIG = {
@@ -19,6 +19,12 @@ VALID_CONFIG = {
 @pytest.fixture(autouse=True)
 def _no_ambient_config(monkeypatch):
     monkeypatch.delenv("SPAKR_CONFIG", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _database_up(monkeypatch):
+    """Health tests do not need a live MySQL: report a database at the expected version."""
+    monkeypatch.setattr(integration, "database_versions", lambda config: (2, 2))
 
 
 @pytest.fixture
@@ -43,6 +49,13 @@ def test_health_reports_versions(client):
     assert body["software_version"] == software_version()
     assert set(body["database_version"]) == {"expected", "current", "state"}
     assert response.headers["X-API-Version"] == str(API_VERSION)
+
+
+def test_health_degraded_when_database_unreachable(client, monkeypatch):
+    monkeypatch.setattr(integration, "database_versions", lambda config: (2, None))
+    response = client.get("/api/v1/health")
+    assert response.status_code == 503
+    assert response.get_json()["database_version"]["state"] == "unavailable"
 
 
 def test_no_config_file_fails_gracefully(unconfigured):
