@@ -220,6 +220,8 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.27** systemd service and timer for prune-media in examples/ (runs as the app user, nice and ionice, dry-run unless apply is enabled in settings) with install notes in the admin guide [0.7] — needs: MED.26, FND.6
 - [ ] **MED.28** Admin prune API: trigger a run, view status, last report and history, edit prune settings [0.7] — needs: MED.26, API.4, AUTH.8
 - [ ] **MED.29** Media suite tests: prune never deletes referenced or history-held files, grace period, lock against concurrent upload, replace keeps embeds, visibility and takedown leak tests [0.7] — needs: MED.25, MED.15, MED.21, MED.14
+- [ ] **MED.30** Logo and site-icon derivation as a queue task: from the uploaded logo, ImageMagick writes the favicon (ico and png sizes), Apple touch icon, web app manifest icons including maskable, an Open Graph image fallback and, where practical, monochrome and dark variants; never enlarged, a minimum source size is required, SVG is accepted only if the SVG upload policy allows it with a raster fallback; stored in the hashed media layout and regenerated whenever the logo changes [0.7] — needs: MED.3, MED.4, QUE.2
+- [ ] **MED.31** Routes serving the derived site icons and manifest assets with cache headers (long-lived for hashed URLs, short for /favicon.ico) [0.7] — needs: MED.30
 
 ## UI: Web UI (first-party JavaScript client)
 
@@ -279,6 +281,10 @@ Owner decision: a top bar with tab navigation for account, tools and settings an
 - [ ] **UX.22** Settings menu: user settings and grouped admin settings (CFG.7 screens), admin items only for admins [0.8] — needs: UX.14, CFG.7
 - [ ] **UX.23** Always-visible search in the top bar with the search-as-you-type combobox; collapses to a button on small screens [0.8] — needs: UX.4, UI.19
 - [ ] **UX.24** Shell guide for developers and admins: how to add a menu item, a tool or a rail section, and how permissions map to items [0.9] — needs: UX.14, UX.21, UX.22
+- [ ] **UX.25** Logo space at the top left of the top bar: the logo image with alt text linking home, sized per breakpoint, and a text wordmark of the site name when no logo is set; the default icons come from the make-icons tool [0.1] — needs: UX.4, UI.17
+- [ ] **UX.26** Logo setting and upload flow in the admin settings: choose the logo through the normal upload interface, alt text, preview of the derived icons, replace and remove [0.8] — needs: UX.25, CFG.7, UI.8, MED.30
+- [ ] **UX.27** Head tags and web manifest generated from settings: icon links, apple-touch-icon, theme colour, Open Graph image fallback and manifest.webmanifest with the site name and derived icons [0.8] — needs: UX.26, MED.31, UI.18
+- [ ] **UX.28** Logo and icon tests: derived sizes, never enlarged, minimum-size rejection, SVG policy, wordmark fallback, regeneration on change, cache headers, alt text [0.8] — needs: UX.27, MED.30
 
 ## OPS: Hardening and operations
 
