@@ -5,6 +5,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 ## [Unreleased]
 
 ### Changed
+- Decided: the app rewrites `config.json` atomically at mode 0600; secret fields are write-only in the UI. RES.20 now only confirms implementation details (CFG.5).
 - Email goes through an external SMTP relay, never a local MTA; relay settings and sender address are configuration (MAIL.1 unblocked, RES.6 reworded).
 - Media: ffmpeg and ImageMagick are the preferred tools; Python libraries allowed where measurably better (RES.10, MED.4).
 - Config: secrets live in `config.json`, everything is editable in the web interface except the MySQL credentials. Admin settings API (AUTH.8) never returns secrets.

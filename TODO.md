@@ -240,7 +240,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.17** Backup approach for MySQL, the git store and media (mysqldump, git bundle, rsync) [0.0]
 - [ ] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
 - [ ] **RES.19** Import and export formats [0.0]
-- [ ] **RES.20** Settings and secrets: write-only secret fields, atomic writes of config.json, file permissions and reload across workers (recommended default recorded in the plan) [0.0]
+- [ ] **RES.20** Settings and secrets implementation details: file locking, mode 0600, atomic rewrite of config.json and reload across workers (approach decided: the app rewrites config.json, secret fields write-only) [0.0]
 
 ## TST: Testing and sample content
 
@@ -259,6 +259,6 @@ Issue: [#31](https://github.com/dwhagar/spakr/issues/31)
 - [ ] **CFG.2** Settings registry: each option defined once (key, type, default, secret, web-editable, validation) and used by the loader, API, UI and example [0.1] — needs: FND.2, RES.20
 - [ ] **CFG.3** MySQL credentials: manual-only in config.json; never exposed or editable through the API or UI; clear startup error if missing [0.1] — needs: FND.2, CFG.2
 - [ ] **CFG.4** Settings store: non-secret settings in the database config table with typed access, caching and audit of changes [0.4] — needs: CFG.2, DB.2
-- [ ] **CFG.5** Secrets handling: secrets live in config.json (mode 0600), written atomically by the app, write-only through the API (set or unset, never returned), redacted in logs and audit [0.4] — needs: CFG.2, RES.20
+- [ ] **CFG.5** Secrets handling (decided): the app rewrites config.json atomically at mode 0600 with file locking; secret fields are write-only through the API and UI (set or unset, never returned), redacted in logs and audit [0.4] — needs: CFG.2, RES.20
 - [ ] **CFG.6** Live reload of changed settings across WSGI workers and the queue worker [0.4] — needs: CFG.4, CFG.5, QUE.2
 - [ ] **CFG.7** Admin settings screens for every web-editable option, grouped and validated, secret fields write-only [0.8] — needs: CFG.4, CFG.5, AUTH.8, UI.3, UI.13
