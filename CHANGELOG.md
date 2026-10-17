@@ -9,6 +9,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 - New suggested items: AUTH.12 (user data export), MED.9 (optional ClamAV scan), MED.10 (captions and transcripts), DOC.7 (privacy page).
 
 ### Changed
+- Assumption recorded: Apache2 handles TLS and a valid domain certificate is in place; no certificate handling in the app. Added API.6 (trust Apache HTTPS signal, Secure and __Host- cookies, HSTS only if the admin enables it).
 - CSRF design is a synchronizer token tied to the server session plus a Fetch Metadata check, replacing the double-submit token (RES.5, AUTH.2); invitation and reset tokens travel in the URL fragment and are consumed by a POST (AUTH.4, AUTH.5); API keys cannot manage keys or account security (AUTH.6).
 - Hosting: apt mod_wsgi in daemon mode must set `WSGIPassAuthorization On` or the app never sees `Authorization: Bearer` (verified), plus `WSGIApplicationGroup %{GLOBAL}` (FND.3, FND.6).
 - Packaging: Python libraries come from a hashed virtualenv lock, not apt (24.04 ships SQLAlchemy 1.4 and pydantic 1.10); PyMySQL (MIT) is the MySQL driver instead of the GPL mysqlclient (FND.1, DB.1).
