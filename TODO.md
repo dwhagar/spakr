@@ -278,4 +278,4 @@ Issue: [#31](https://github.com/dwhagar/spakr/issues/31)
 - [ ] **CFG.5** Secrets handling (decided): the app rewrites config.json atomically at mode 0600 with file locking; secret fields are write-only through the API and UI (set or unset, never returned), redacted in logs and audit [0.4] — needs: CFG.2, RES.20
 - [ ] **CFG.6** Live reload of changed settings across WSGI workers and the queue worker [0.4] — needs: CFG.4, CFG.5, QUE.2
 - [ ] **CFG.7** Admin settings screens for every web-editable option, grouped and validated, secret fields write-only [0.8] — needs: CFG.4, CFG.5, AUTH.8, UI.3, UI.13
-- [ ] **CFG.8** Graceful failure when config.json is missing or invalid: a clear message naming the file and examples/config.json.example, non-zero exit from the command line, no traceback, and the app reports itself as not configured [0.1] — needs: FND.2, CFG.2
+- [x] **CFG.8** Graceful failure when config.json is missing or invalid: a clear message naming the file and examples/config.json.example, non-zero exit from the command line, no traceback, and the app reports itself as not configured [0.1] — needs: FND.2, CFG.2
