@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Data model - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="tree.html">Tree</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Data model</h1>
 
 <p>Every page has a common header (id, slug, type, title, setting tags, summary, created/updated, current git commit) and a Markdown body stored in git. Type-specific fields are stored in the database and mirrored in the page's front matter (MultiMarkdown metadata) so the git copy is self-describing.</p>
