@@ -4,6 +4,8 @@ Current version: **0.0.0** (see [`VERSION`](VERSION) and [`scripts/version.sh`](
 
 Items are numbered `[CAT].[NUMBER]`, for example `API.1`. Each item shows its phase in square brackets (the MINOR version that delivers it) and `needs:` the ids it depends on, so the list forms a tree rooted in phase 0.0 research and the foundation. Phases 0.1 to 0.8 are building blocks; **0.9 is the pre-release working version**; 1.0 is the release. See the [phase plan](docs/plan/tiers.html) and the [dependency tree](docs/plan/tree.html).
 
+**Standing requirement (integrity):** every stored artifact has a checksum and is classed as source of truth or rebuildable, with parity data and a tested recovery path (INT category).
+
 **Standing requirement:** every UI item is responsive and works in light and dark mode from the start (UI.11 to UI.13 are the base; UI.13 is the checklist all later UI items meet).
 
 Each category is a GitHub issue holding the same checklist (ids, titles, phases). Bugs and suggestions arrive as their own issues and are folded in here when accepted. Numbers are never reused; new items are appended. This file is kept by the TODO thread and is the source of truth: change it and the matching issue together.
@@ -69,7 +71,7 @@ Issue: [#12](https://github.com/dwhagar/spakr/issues/12)
 
 - [x] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
 - [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, type tables, page_search, media, html_allowlist, upload_policy
-- [ ] **DB.3** Command to rebuild the MySQL index from the git content store [0.2] — needs: DB.2, GIT.5, SEARCH.2
+- [ ] **DB.3** Command to rebuild all derived MySQL data (page index, search tables, relations) from the git content store; resumable, dry-run option [0.2] — needs: DB.2, GIT.5, SEARCH.2, INT.1
 - [ ] **DB.4** Database backup and restore script [0.9] — needs: DB.2
 - [x] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
 
@@ -254,7 +256,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, UI.21, RES.18, UI.13
-- [ ] **OPS.5** Backup and restore commands (spakr backup, spakr restore) covering git store, MySQL and media [0.9] — needs: DB.4, GIT.1, MED.3, RES.17
+- [ ] **OPS.5** Backup and restore commands (spakr backup, spakr restore) covering git store, MySQL, media, hash manifests and parity data [0.9] — needs: DB.4, GIT.1, MED.3, RES.17, INT.10
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
 
@@ -287,6 +289,9 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.23** Device range from small phone and foldable to tablet, desktop and big-screen TV: breakpoints and fluid type, foldable viewport segments, 10-foot layout and remote or keyboard focus navigation, safe areas, test matrix [0.0]
 - [x] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
 - [x] **RES.25** Caching of rendered pages in memory and on disk: key by content, layers, eviction, link-status pass (docs/research/caching.html) [0.0]
+- [ ] **RES.26** Parity and redundancy for /data: par2-style parity versus erasure coding (zfec, reedsolo) versus filesystem options (ZFS or btrfs scrub, dm-integrity, RAID); cost for 100 MB videos and for git packs, how parity is stored and refreshed, recovery procedure [0.0]
+- [ ] **RES.27** Source of truth versus rebuildable: classify every table and file; what lives only in MySQL (accounts, settings, audit, invitations) and so needs a checksummed journal; what is rebuilt from the git content store and media originals; depends on the MySQL-versus-git findings [0.0]
+- [ ] **RES.28** Checksum design: hash algorithm (SHA-256 versus BLAKE2 in hashlib), manifest format and location, row or table checksums and an audit hash chain in MySQL, migration records, cost of scheduled verification [0.0]
 
 ## TST: Testing and sample content
 
@@ -296,6 +301,29 @@ Issue: [#28](https://github.com/dwhagar/spakr/issues/28)
 - [ ] **TST.2** API test client and authentication helpers [0.4] — needs: TST.1, AUTH.2
 - [ ] **TST.3** Sample content set across all entity types and the three settings (CC BY-SA), loadable by CLI [0.5] — needs: ENT.11, FND.9
 - [ ] **TST.4** End-to-end smoke test: install, create admin, write, link, search, upload [0.9] — needs: UI.8, TST.3, OPS.7
+
+## INT: Integrity, parity and recovery
+
+Issue: [#51](https://github.com/dwhagar/spakr/issues/51)
+
+Principle (owner decision): the system is built from the ground up with checksums and parity data so a damaged database or store can be detected and rebuilt. Every stored artifact has a checksum, every artifact is classed as source of truth or rebuildable (INT.1), and every class has a tested recovery path.
+
+- [ ] **INT.1** Integrity principle and data classification recorded in docs/design/integrity.html: source of truth versus rebuildable for every table and file, checksum rules, recovery path per class; DB, GIT and MED items conform to it [0.1] — needs: RES.26, RES.27, RES.28
+- [ ] **INT.2** Schema integrity rules: migration records carry a content hash and refuse to run on a mismatch, row checksums on source-of-truth tables, hash-chained audit log; added as a migration on top of DB.2 [0.1] — needs: DB.2, INT.1
+- [ ] **INT.3** Hash manifest library: compute and verify SHA-256 manifests per directory with atomic writes, used by every store [0.1] — needs: FND.11, INT.1
+- [ ] **INT.4** Content store checks: git fsck after maintenance and on schedule, ref and HEAD verification, page files compared with the MySQL index [0.2] — needs: GIT.1, INT.3
+- [ ] **INT.5** Media rebuild: rebuild media records, usage index and variants from originals and manifests; resumable, dry-run option [0.7] — needs: MED.11, MED.12, INT.3
+- [ ] **INT.6** Media checksums: originals and variants hashed at upload and processing, recorded in the media record and manifest, verified by scheduled checks and optionally on serve [0.7] — needs: MED.3, MED.6, INT.3
+- [ ] **INT.7** Parity data for the content store, in the scheme chosen by RES.26, refreshed by a queue task and stored under /data/parity [0.2] — needs: RES.26, GIT.1, INT.3, QUE.2
+- [ ] **INT.8** Parity data for media originals (and variants if cheap), same scheme, refreshed after upload and replace [0.7] — needs: INT.7, MED.3
+- [ ] **INT.9** Journal of MySQL-only source-of-truth data (accounts, settings, audit, invitations) to checksummed files, written on change and compacted daily, so the database can be rebuilt from it [0.4] — needs: INT.2, AUTH.7, CFG.4
+- [ ] **INT.10** `spakr verify` command: runs every check (git fsck, manifests, row checksums, migration hashes, parity), human and JSON reports, exit codes, repair plan output [0.2] — needs: INT.3, INT.4, FND.9
+- [ ] **INT.11** Scheduled verification: systemd service and timer in examples/ (light daily, full weekly), results stored and the admin notified on failure [0.7] — needs: INT.10, FND.6, INT.6
+- [ ] **INT.12** Health and status report integrity state (ok, degraded, corrupt, last verified) and bump the API version for the new fields [0.2] — needs: INT.10, API.8
+- [ ] **INT.13** `spakr repair`: repair from parity, restore from backup, quarantine corrupt files, rebuild derived data; dry-run by default, audit entry per run [0.7] — needs: INT.10, INT.5, INT.7, INT.8, INT.9, AUTH.7
+- [ ] **INT.14** Admin integrity screen: status, last verification, run verify, review repair plan [0.8] — needs: INT.12, INT.13, UI.7
+- [ ] **INT.15** Damage-and-recover tests: corrupt git objects, drop the MySQL database, flip bytes in media, truncate manifests; assert detection and full recovery [0.7] — needs: INT.13, INT.5, INT.8
+- [ ] **INT.16** Recovery guide for admins: what is checked, how to read a verify report, how to repair and rebuild, how backups and parity fit together [0.9] — needs: INT.13, OPS.5
 
 ## CFG: Configuration and settings
 
