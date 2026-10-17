@@ -21,6 +21,9 @@ def _no_ambient_config(monkeypatch):
     monkeypatch.delenv("SPAKR_CONFIG", raising=False)
 
 
+_REAL_DATABASE_VERSIONS = integration.database_versions
+
+
 @pytest.fixture(autouse=True)
 def _database_up(monkeypatch):
     """Health tests do not need a live MySQL: report a database at the expected version."""
@@ -193,6 +196,7 @@ def test_database_version_reported_when_db_layer_present(monkeypatch):
     fake.create_db_engine = lambda settings: object()
     fake.get_schema_version = lambda engine: 2
     monkeypatch.setitem(sys.modules, "spakr.db", fake)
+    monkeypatch.setattr(integration, "database_versions", _REAL_DATABASE_VERSIONS)
     response = create_app(config={}).test_client().get("/api/v1/health")
     assert response.status_code == 503
     body = response.get_json()
