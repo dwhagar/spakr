@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tiers and versions - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Tiers and versions</h1>
 
 <p>Versions below 1.0 are internal milestones. Each tier is shippable on its own. Dates are intentionally absent.</p>
 <table><tr><th>Tier</th><th>Version</th><th>Theme</th><th>Contents</th></tr>
-<tr><td>0</td><td>0.1</td><td>Foundation</td><td>Python package skeleton, config loading from JSON, MySQL schema migrations, WSGI entry point, CGI shim, Apache vhost example, dev setup script, CI running lint and tests (scheduled only, see below).</td></tr>
+<tr><td>0</td><td>0.1</td><td>Foundation</td><td>Python package skeleton, config loading from JSON, Flask app factory and <code>/api/v1</code> skeleton, shared outbound HTTP helper with User-Agent, MySQL schema migrations (Alembic, from the <a href="../design/database.html">database design</a>), WSGI entry point, CGI shim, Apache vhost example, dev setup script, CI running lint and tests (scheduled only, see below).</td></tr>
 <tr><td>1</td><td>0.2</td><td>Content store</td><td>Git-backed page repository: create, read, update, history, diff, revert. MySQL index of pages (slug, type, title, setting, current commit).</td></tr>
 <tr><td>1</td><td>0.3</td><td>Rendering</td><td>MultiMarkdown rendering, LaTeX math, HTML sanitizer with admin allowlist, strict output Content-Security-Policy (no inline script or style).</td></tr>
 <tr><td>2</td><td>0.4</td><td>Entity types</td><td>All entity types with their structured fields (see <a href="data-model.html">data model</a>), create/edit forms, free pages, settings tags.</td></tr>
-<tr><td>2</td><td>0.5</td><td>Accounts and visibility</td><td>Registration/login, roles (admin, GM, editor, reader), sessions, CSRF protection, admin settings screen, HTML allowlist approval screen, per-page visibility (public or GM-only) enforced in every query.</td></tr>
+<tr><td>2</td><td>0.5</td><td>Accounts, API keys and visibility</td><td>Login, roles (reader, editor, GM, mod, admin) and permissions, sessions, CSRF protection, invitations and password-reset email flows (queue-sent), user and account editing suite in the web UI, API keys (users: own permissions only; admins: unlimited), admin settings screen, HTML allowlist approval screen, per-page visibility (public or GM-only) enforced in every query, audit log.</td></tr>
 <tr><td>3</td><td>0.6</td><td>Links and browse</td><td>Wiki-style links between pages, backlinks, relations (character to place, item to race, ...), browse by type and setting, tags.</td></tr>
-<tr><td>3</td><td>0.7</td><td>Search</td><td>MySQL full-text search over page text and fields, filters by type and setting. GM-only pages are excluded for users without the GM role.</td></tr>
-<tr><td>4</td><td>0.8</td><td>Uploads and queue</td><td>Redis task queue and worker; upload pipeline (type sniffing, size limits, safe-list, quarantine, admin override); image processing with ImageMagick and video and audio processing with ffmpeg as queue tasks, thumbnails, and embedded HTML5 players via a Markdown media syntax; background jobs for reindex.</td></tr>
+<tr><td>3</td><td>0.7</td><td>Search</td><td>MySQL full-text search over page text and fields, filters by type and setting, SEO metadata, sitemap.xml and robots.txt, memory (Redis and per-process) and disk caches for rendered pages. GM-only pages are excluded for users without the GM role.</td></tr>
+<tr><td>4</td><td>0.8</td><td>Uploads and queue</td><td>Redis task queue and worker; upload pipeline (type sniffing, size limits, safe-list, quarantine, admin override); image processing with ImageMagick and video and audio processing with ffmpeg as queue tasks, thumbnails, embedded HTML5 players via a Markdown media syntax, hashed media directories with a gated, never-enlarged series of resolutions; background jobs for reindex.</td></tr>
 <tr><td>5</td><td>0.9</td><td>Hardening</td><td>Security review, backups script, rate limiting, error pages, accessibility pass, documentation for admins and editors, import/export.</td></tr>
 <tr><td><strong>6</strong></td><td><strong>1.0</strong></td><td><strong>Release</strong></td><td><strong>Working, functional, usable web site</strong>: everything above deployed on Ubuntu LTS with Apache, MySQL, Redis; an admin can install it from the docs, create accounts, write and revise pages of every type, link and search them, and upload safe files.</td></tr>
 <tr><td>7</td><td>1.1+</td><td>After release</td><td>Ideas, not committed: multiple campaigns per install, structured character sheets and game-system rules, maps, API tokens, JSON/Markdown export bundles, localisation.</td></tr>
@@ -26,6 +26,7 @@
 <li>Editors can create, edit, view history of, and revert any page type through the browser.</li>
 <li>Target platform is Ubuntu 24.04 LTS; Ubuntu 26.04 LTS is best effort and fixed as found.</li>
 <li>Readers can browse and search without logging in (default; configurable).</li>
+<li>Every feature is reachable through the API with permissions; the web UI uses nothing else.</li>
 <li>No content path can produce script, inline style, or unapproved HTML.</li>
 <li>GM-only pages never appear in views, search, links, backlinks, history or downloads for users without the GM role.</li>
 </ul>

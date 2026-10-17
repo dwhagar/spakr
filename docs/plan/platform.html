@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform services - spakr</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<h1>Platform services</h1>
+
+<p>Cross-cutting services every tier builds on. Libraries named here are the planned defaults and are to be re-verified against Ubuntu 24.04 packages when 0.1 starts.</p>
+
+<h2>Flask API, and everything goes through it</h2>
+<ul>
+<li>The backend is a <strong>Flask</strong> application served by Apache <code>mod_wsgi</code> (Flask is a WSGI app, so the Apache setup is unchanged). It supersedes the earlier "plain WSGI" default.</li>
+<li>All reads and writes go through a versioned JSON API under <code>/api/v1/</code>. The web UI is a client of that API: server-rendered pages obtain their data and perform their actions only by calling the API (through an in-process client, so there is no second code path for permissions), and nothing in the UI touches the database or git directly. Command-line scripts and the worker use the same service layer the API uses.</li>
+<li>The API version is a single integer, part of the URL, and reported in the <code>User-Agent</code> (below) and in responses (<code>X-API-Version</code>).</li>
+<li>Planned libraries: <code>Flask</code>, <code>SQLAlchemy</code> (Core and ORM) with <code>Alembic</code> migrations, <code>marshmallow</code> or <code>pydantic</code> for request validation, <code>Flask-Limiter</code> for rate limits.</li>
+</ul>
+
+<h2>Accounts and roles</h2>
+<table><tr><th>Role</th><th>Can</th></tr>
+<tr><td>Reader</td><td>View public pages and search; manage own profile and own API keys.</td></tr>
+<tr><td>Editor</td><td>Reader plus create and edit pages and upload media; revert own edits.</td></tr>
+<tr><td>GM</td><td>Editor plus see and edit GM-only pages.</td></tr>
+<tr><td>Mod</td><td>Editor plus revert any edit, hide or delete pages and media, review quarantined uploads, suspend users temporarily.</td></tr>
+<tr><td>Admin</td><td>Everything: site settings, HTML allowlist, upload policy, roles, all users and keys, purge originals.</td></tr>
+</table>
+<p>Roles are sets of named permissions stored in the database, so admins can adjust them. A user can hold several roles (for example Mod and GM). Anonymous reading is allowed by default.</p>
+
+<h2>User and account editing suite (web UI)</h2>
+<ul>
+<li>Self service: profile, display name, email change (with confirmation), password change, active sessions with sign-out, own API keys, notification preferences.</li>
+<li>Admin and mod screens: list, search and filter users; create, edit, suspend, reactivate and delete accounts; assign roles; force password reset; view audit trail; invite users.</li>
+<li>Every action is an API call guarded by permissions and written to the audit log.</li>
+</ul>
+
+<h2>Email flows</h2>
+<ul>
+<li><strong>Invitations</strong>: an admin or mod invites an email address with a role; the invitee receives a single-use, expiring link to choose a username and password.</li>
+<li><strong>Password reset</strong>: request by email, single-use expiring link; responses never reveal whether an address exists.</li>
+<li><strong>Email confirmation</strong> for new addresses; security notices for password and email changes.</li>
+<li>Tokens are random, stored only as hashes, and expire (invitation default 7 days, reset default 1 hour).</li>
+<li>Mail is sent by queue tasks through SMTP (<code>smtplib</code> with the local MTA or a relay set in the config file), with retries and an outbox table for the admin to inspect failures. Templates are plain text plus simple HTML, stored in the code tree.</li>
+</ul>
+
+<h2>API keys and permissions</h2>
+<ul>
+<li>Keys are sent as <code>Authorization: Bearer &lt;key&gt;</code>. A key is shown once at creation; only a hash and a short prefix are stored.</li>
+<li>Each key has a set of permissions chosen at creation, an optional expiry and IP restriction, a name, and a last-used timestamp. Keys can be revoked at any time.</li>
+<li><strong>Users</strong> create their own keys, and a key can only carry permissions its owner holds. At every request the key's effective permissions are the intersection of the key's permissions and the owner's <em>current</em> permissions, so losing a role immediately limits that user's keys. Users are limited to a configurable number of active keys (default 10).</li>
+<li><strong>Admins</strong> can create unlimited keys, and can create keys for service use that are not tied to a person (owned by a service account).</li>
+<li>Browser sessions use a cookie with CSRF protection; API-key requests do not use cookies and are exempt from CSRF but rate limited per key.</li>
+</ul>
+
+<h2>Outbound HTTP User-Agent</h2>
+<ul>
+<li>Every HTTP request the app makes itself (webhooks, link checks, fetching remote metadata, anything else) goes through one shared helper in <code>src/</code> that sets the header, so no code builds its own.</li>
+<li>The string follows RFC 9110: product tokens of the form <code>name/version</code>, plus a comment, with the contact URL in the comment. Format:
+<pre>spakr/1.2.3 spakr-api/1 (+https://your.site.example/about)</pre>
+Software name, software version and API version are always present; the contact URL is taken from the site config.</li>
+<li>Version values come from the single version constant in the code. Tests assert the format.</li>
+</ul>
+
+<h2>Media storage layout</h2>
+<ul>
+<li>Files are stored by content hash (SHA-256) in nested directories for easy lookup: the first two byte pairs form the directories, and the whole hash names the leaf directory.
+<pre>media/ab/cd/abcdef0123...full-sha256/
+    original.mp4           (private originals live in a separate tree, never served)
+    full.jpg               optimized copy at the source size
+    w1920.jpg
+    w1280.jpg
+    w640.jpg
+    w320.jpg
+    thumb.jpg              small square or poster thumbnail
+    poster.jpg             video poster
+    cover.jpg              audio cover art, when present</pre></li>
+<li>Variants are named simply (<code>w&lt;width&gt;</code>, <code>thumb</code>, <code>poster</code>, <code>cover</code>) and sit in the same directory as the hash they belong to. Identical uploads share one directory (deduplication).</li>
+<li><strong>Gated series, never enlarged</strong>: the worker computes the ladder of target widths (for example 1920, 1280, 640, 320) and produces a size only if the source is at least that wide. The first rung at or below the source width is made from the source, each smaller rung is made from the previous one, and nothing is ever scaled up. The <code>full</code> copy is always made, as an optimized re-encode at the source size. A source smaller than the smallest rung gets <code>full</code> and <code>thumb</code> only (thumb never above the source size).</li>
+<li>Ladder widths and quality settings are admin configuration.</li>
+<li>Originals are kept privately (see <a href="content.html">content</a>), in a parallel tree outside the web root.</li>
+</ul>
+
+<h2>Caching</h2>
+<ul>
+<li><strong>Memory</strong>: per-process LRU for hot small items (sessions' permission sets, settings, allowlist), and Redis for shared cache across WSGI processes. Planned library: <code>Flask-Caching</code> with a Redis backend.</li>
+<li><strong>Disk</strong>: rendered page HTML keyed by git commit hash and visibility, and generated media variants, in a cache directory that is safe to delete (<code>FileSystemCache</code> or plain files). Apache serves static variants with long <code>Cache-Control</code> and ETags because their path contains the hash.</li>
+<li>Invalidation: a page save bumps its commit hash, which changes the key; the worker prunes stale entries. GM-only output is never put in a cache shared with public output (the key includes visibility).</li>
+</ul>
+
+<h2>SEO</h2>
+<ul>
+<li>Public pages get unique titles, meta descriptions (from the page summary), canonical URLs, Open Graph and Twitter card tags, and <code>schema.org</code> JSON-LD (for example <code>Article</code>), generated by one helper from page data.</li>
+<li><code>sitemap.xml</code> and <code>robots.txt</code> are generated by the worker; GM-only and private pages are excluded and marked <code>noindex</code>. Redirects for renamed slugs return 301.</li>
+<li>Candidate libraries (to evaluate in research before 0.3): <code>python-slugify</code> for slugs, a small in-house sitemap writer or <code>flask-sitemapper</code>, and plain Jinja templates for the meta tags. Choose the smallest set that works.</li>
+</ul>
+
+</main></body></html>

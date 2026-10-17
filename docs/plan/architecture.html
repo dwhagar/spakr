@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Architecture - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Architecture</h1>
 
 <h2>Stack</h2>
 <table><tr><th>Layer</th><th>Choice</th></tr>
 <tr><td>OS</td><td>Ubuntu 24.04 LTS (required); 26.04 LTS best effort</td></tr>
 <tr><td>Web server</td><td>Apache 2.4 with <code>mod_wsgi</code> (main app) and <code>mod_cgi</code>/<code>mod_cgid</code> (small standalone scripts), configured by a virtual host file</td></tr>
+<tr><td>Framework</td><td>Flask (API and UI), SQLAlchemy and Alembic, Jinja2</td></tr>
 <tr><td>Language</td><td>Python 3 (the distribution's version; 3.12 on 24.04)</td></tr>
 <tr><td>Database</td><td>MySQL 8 (accounts, index, relations, settings)</td></tr>
 <tr><td>Queue</td><td>Redis, with a Python worker (RQ or a small in-house consumer; default RQ)</td></tr>
@@ -17,7 +18,7 @@
 </table>
 <h2>Process model</h2>
 <ul>
-<li><strong>WSGI app</strong>: all page views, editing, login, search. Small framework (default: plain WSGI with a thin router, no heavy dependency).</li>
+<li><strong>Flask app (WSGI)</strong>: the versioned JSON API under <code>/api/v1/</code> plus the server-rendered web UI, which is a client of that API. See <a href="platform.html">platform services</a>.</li>
 <li><strong>CGI</strong>: only for a few small scripts, never the main app; kept for tiny, isolated endpoints (health check, upload receiver if separate privileges are wanted). Same code library as the WSGI app.</li>
 <li><strong>Worker</strong>: systemd service consuming the Redis queue. Jobs: render cache warm, reindex, upload scanning, image and video processing, git maintenance (gc), backups.</li>
 <li><strong>Git writes</strong> are serialised with a lock so concurrent saves cannot corrupt the repository. Each save is one commit authored by the logged-in user.</li>
@@ -28,6 +29,15 @@
 docs/           archive, research, design, plan (plan is HTML for GitHub Pages)
 examples/       Apache vhost, systemd units, config.json.example
 scripts/        maintenance scripts (backup, migrate, reindex)</pre>
+<h2>Layers</h2>
+<pre>browser / API client / scripts
+        |
+   Flask API  (/api/v1, auth by session cookie or API key, permissions)
+        |
+   service layer  (pages, media, users, search)
+     /      |       \\
+  MySQL    git     Redis queue -> worker (ffmpeg, ImageMagick, mail, reindex)</pre>
+<p>The web UI never bypasses the API. Outbound HTTP uses one shared client helper with a standards-compliant User-Agent.</p>
 <h2>Configuration</h2>
 <p>Runtime settings (database credentials, Redis URL, content repo path, upload limits, secret key) live in JSON files outside version control. <code>.gitignore</code> ignores every <code>*.json</code>. Examples are committed as <code>*.json.example</code>. Admin-editable settings live in the database.</p>
 
