@@ -222,6 +222,6 @@ __marimo__/
 # Configuration lives in JSON files and must never be committed
 *.json
 
-# All runtime data (config, content repo, media, caches) lives in /data and is never committed
+# All runtime data (content repository, media, originals, cache) lives in /data and is never committed
 /data/
 src/spakr/_version.txt
