@@ -16,7 +16,7 @@
 <tr><td>Key limits</td><td>Non-admin users: up to 10 active API keys, admin adjustable; admins unlimited</td></tr>
 <tr><td>Token lifetimes</td><td>Invitation 7 days, password reset 1 hour</td></tr>
 <tr><td>Media ladder</td><td>Widths 1920, 1280, 640, 320 plus full, thumb, poster, cover; admin adjustable</td></tr>
-<tr><td>Email transport</td><td>SMTP through the local MTA or a configured relay</td></tr>
+<tr><td>Email transport</td><td>Decided: SMTP through an external relay, never a local MTA. Relay host, port, TLS mode, username, password and sender address are all configuration (the secret ones in <code>config.json</code>, the rest editable in the admin settings)</td></tr>
 <tr><td>User-Agent</td><td><code>spakr/&lt;version&gt; spakr-api/&lt;n&gt; (+&lt;site contact URL&gt;)</code></td></tr>
 <tr><td>Queue library</td><td>RQ on Redis</td></tr>
 <tr><td>Content storage</td><td>Markdown in git is the source of truth; MySQL is a rebuildable index plus accounts</td></tr>
@@ -27,9 +27,10 @@
 <tr><td>Default upload types</td><td>PNG, JPEG, GIF, WebP, MP4/WebM/MOV video, common audio, TXT, MD, CSV; SVG and PDF off</td></tr>
 <tr><td>Video</td><td>Video and audio allowed by default, always transcoded by ffmpeg; shown with native HTML5 players, thumbnails from metadata or a video frame, audio cover art when present</td></tr>
 <tr><td>Media embedding</td><td>Markdown-level <code>media:</code> syntax expanded by the renderer into admin-controlled player markup; authors write no HTML</td></tr>
-<tr><td>Media library calls</td><td>subprocess for ffmpeg and ImageMagick (not Wand or ffmpeg-python); Pillow for in-process checks</td></tr>
+<tr><td>Media library calls</td><td>ffmpeg (all audio and video) and ImageMagick (images) are the preferred tools, called by subprocess; Python libraries (for example Pillow) are allowed where measurably more efficient; RES.10 confirms the choice per operation</td></tr>
 <tr><td>Upload size limit</td><td>10 MB for general files and images; 100 MB for video; both admin adjustable</td></tr>
 <tr><td>Relation types</td><td>Decided: fixed vocabulary in an admin-managed <code>relation_kind</code> table, not free-form labels</td></tr>
+<tr><td>Configuration</td><td>Decided: every option holding a secret lives in <code>config.json</code> (git-ignored, mode 0600; example at <code>examples/config.json.example</code>). Everything is changeable in the web interface (admin settings backed by the API) except the MySQL credentials, which are configured manually in <code>config.json</code> only. Recommended default for the secrets (RES.20 confirms): the app writes <code>config.json</code> atomically, secret fields are write-only in the UI and API (set or unset, never returned or logged), non-secret settings live in the database. Trade-off: the app user needs write access to <code>config.json</code>; a database-held encrypted store with a key in <code>config.json</code> is the fallback.</td></tr>
 <tr><td>Version stamp</td><td>MAJOR.MINOR in <code>VERSION</code> by hand; BUILD derived from git by <code>scripts/version.sh</code> (commits on main since VERSION last changed), so no CI is needed</td></tr>
 <tr><td>Search</td><td>One <code>page_search</code> index serves full-page content search and field filters (type, setting, tag, name, type fields); see <a href="../design/database.html">database design</a></td></tr>
 <tr><td>Python</td><td>Distribution Python 3 on each LTS</td></tr>
@@ -49,7 +50,6 @@
 <h2>Still open</h2>
 <h2>New open questions</h2>
 <ol>
-<li>Which SMTP relay or sender address will the site use?</li>
 </ol>
 <p>Earlier questions: Resolved late: video limit 100 MB; originals kept privately after transcoding with an admin purge option.</p>
 <p>Also decided: Flask API-first architecture, API keys, Markdown/media storage layout, caching, accounts and SEO as planned in <a href="platform.html">platform services</a>.</p>

@@ -42,7 +42,7 @@
 <li><strong>Password reset</strong>: request by email, single-use expiring link; responses never reveal whether an address exists.</li>
 <li><strong>Email confirmation</strong> for new addresses; security notices for password and email changes.</li>
 <li>Tokens are random, stored only as hashes, and expire (invitation default 7 days, reset default 1 hour).</li>
-<li>Mail is sent by queue tasks through SMTP (<code>smtplib</code> with the local MTA or a relay set in the config file), with retries and an outbox table for the admin to inspect failures. Templates are plain text plus simple HTML, stored in the code tree.</li>
+<li>Mail is sent by queue tasks through SMTP (<code>smtplib</code> through an external relay; host, port, TLS mode, username, password and sender address are settings, never a local MTA), with retries and an outbox table for the admin to inspect failures. Templates are plain text plus simple HTML, stored in the code tree.</li>
 </ul>
 
 <h2>API keys and permissions</h2>

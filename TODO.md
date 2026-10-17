@@ -26,7 +26,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 
 - [x] **DOC.1** Plan rewritten as tiers 0.0 to 0.9 with TODO ids [0.0]
 - [ ] **DOC.2** Enable GitHub Pages from /docs (owner action in repository settings) [0.0]
-- [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5
+- [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5, CFG.1
 - [ ] **DOC.4** Editor guide: writing pages, links, media syntax, visibility [0.9] — needs: UI.4, MED.7, LNK.1
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
@@ -36,7 +36,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 
 - [ ] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
-- [ ] **FND.2** JSON configuration loader with validation against examples/spakr.conf.example [0.1] — needs: FND.1
+- [ ] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
 - [ ] **FND.3** WSGI entry point and the small CGI shim [0.1] — needs: FND.1, API.1, RES.16
 - [ ] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
 - [ ] **FND.5** Dev setup script for Ubuntu 24.04 [0.1] — needs: FND.1, RES.15
@@ -107,7 +107,7 @@ Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 - [ ] **AUTH.5** Password reset flow (1-hour tokens) [0.4] — needs: AUTH.1, MAIL.2
 - [ ] **AUTH.6** API keys: users limited to their own permissions, admins unlimited, per-user cap [0.4] — needs: AUTH.2, AUTH.3
 - [ ] **AUTH.7** Audit log [0.4] — needs: DB.2
-- [ ] **AUTH.8** Admin settings API [0.4] — needs: AUTH.3, API.4
+- [ ] **AUTH.8** Admin settings API: reads and writes every web-editable setting; never returns secret values [0.4] — needs: AUTH.3, API.4, CFG.4, CFG.5
 - [ ] **AUTH.9** HTML allowlist approval API [0.4] — needs: AUTH.8, RND.3
 - [ ] **AUTH.10** Account editing API (profile, email, password, roles) [0.4] — needs: AUTH.2, AUTH.3
 - [ ] **AUTH.11** Bootstrap the first admin account from the command line [0.4] — needs: FND.9, AUTH.1, AUTH.3
@@ -116,8 +116,9 @@ Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 
 Issue: [#17](https://github.com/dwhagar/spakr/issues/17)
 
-- [ ] **MAIL.1** SMTP sender through the local MTA or a configured relay (blocked on the open SMTP question) [0.4] — needs: FND.2, RES.6
+- [ ] **MAIL.1** SMTP sender through an external relay (host, port, TLS mode, username, password and sender address are all configuration) [0.4] — needs: FND.2, RES.6, CFG.2, CFG.5
 - [ ] **MAIL.2** Invitation and password-reset templates, sent via the queue [0.4] — needs: MAIL.1, QUE.2, DB.2
+- [ ] **MAIL.3** Email settings in the admin settings with a send-test-message action [0.4] — needs: MAIL.1, AUTH.8, CFG.4, MAIL.2
 
 ## VIS: Page visibility
 
@@ -179,7 +180,7 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.1** Upload endpoint: type sniffing, size limits (10 MB, 100 MB video), safe-list [0.7] — needs: API.4, RES.9
 - [ ] **MED.2** Quarantine and admin override [0.7] — needs: MED.1
 - [ ] **MED.3** Hashed media directories; originals kept privately [0.7] — needs: MED.1
-- [ ] **MED.4** Image processing with ImageMagick as queue tasks [0.7] — needs: MED.3, QUE.2, RES.10
+- [ ] **MED.4** Image processing with ImageMagick as queue tasks (Pillow where measurably better) [0.7] — needs: MED.3, QUE.2, RES.10
 - [ ] **MED.5** Video and audio transcoding with ffmpeg as queue tasks [0.7] — needs: MED.3, QUE.2, RES.10
 - [ ] **MED.6** Gated thumbnail series, never enlarged [0.7] — needs: MED.4, MED.5
 - [ ] **MED.7** media: Markdown syntax and HTML5 players [0.7] — needs: RND.1, MED.6, UI.14
@@ -195,7 +196,7 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.4** Page editor with preview [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
 - [ ] **UI.5** History, diff and revert screens [0.8] — needs: UI.2, UI.13, GIT.4
 - [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, UI.13, SEARCH.5, LNK.4
-- [ ] **UI.7** Admin screens: settings, allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
+- [ ] **UI.7** Admin screens: allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
 - [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, UI.13, MED.7
 - [ ] **UI.9** Licence statement in the footer and on edit/upload pages [0.8] — needs: UI.2, UI.13
 - [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, UI.13, LNK.7
@@ -208,7 +209,7 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 
 Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 
-- [ ] **OPS.1** Security review [0.9] — needs: UI.7, UI.8, SEARCH.6, VIS.3
+- [ ] **OPS.1** Security review [0.9] — needs: UI.7, UI.8, CFG.7, SEARCH.6, VIS.3
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, RES.18, UI.13
@@ -225,11 +226,11 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.3** HTML sanitiser library (nh3, bleach or own) and how the admin allowlist maps onto it [0.0]
 - [ ] **RES.4** Git access from Python: GitPython, dulwich or the git binary via subprocess; locking and speed [0.0]
 - [ ] **RES.5** Password hashing, sessions and CSRF: argon2-cffi and Flask extensions versus own code [0.0]
-- [ ] **RES.6** Email: SMTP relay and sender address (needs a decision from the owner), library, SPF/DKIM notes [0.0]
+- [ ] **RES.6** Email through an external SMTP relay (never a local MTA): library, TLS modes, relay settings as configuration, SPF/DKIM notes [0.0]
 - [ ] **RES.7** Search approach: InnoDB FULLTEXT (default parser or ngram) versus an external engine; relevance trials on sample pages [0.0]
 - [ ] **RES.8** SEO libraries and markup: sitemap writer, canonical URLs, meta and structured data [0.0]
 - [ ] **RES.9** Upload type sniffing: python-magic or filetype, and whether to add a virus scan [0.0]
-- [ ] **RES.10** Media tool policies on Ubuntu 24.04: ImageMagick policy.xml, ffmpeg builds and sandboxing (builds on docs/research/media-processing.html) [0.0]
+- [ ] **RES.10** Media toolchain per operation: confirm the efficient choice (ImageMagick or Pillow for images; ffmpeg for all audio and video). ffmpeg and ImageMagick are preferred; Python libraries allowed where measurably better (builds on docs/research/media-processing.html) [0.0]
 - [ ] **RES.11** Front-end approach: plain JavaScript modules or a small library, build and asset-hashing tooling, CSP-compatible [0.0]
 - [ ] **RES.12** Rate limiting: Flask-Limiter or own Redis counters [0.0]
 - [ ] **RES.13** Entity field definitions: choose the structured fields and front matter schema for each entity type [0.0]
@@ -239,6 +240,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.17** Backup approach for MySQL, the git store and media (mysqldump, git bundle, rsync) [0.0]
 - [ ] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
 - [ ] **RES.19** Import and export formats [0.0]
+- [ ] **RES.20** Settings and secrets: write-only secret fields, atomic writes of config.json, file permissions and reload across workers (recommended default recorded in the plan) [0.0]
 
 ## TST: Testing and sample content
 
@@ -248,3 +250,15 @@ Issue: [#28](https://github.com/dwhagar/spakr/issues/28)
 - [ ] **TST.2** API test client and authentication helpers [0.4] — needs: TST.1, AUTH.2
 - [ ] **TST.3** Sample content set across all entity types and the three settings (CC BY-SA), loadable by CLI [0.5] — needs: ENT.11, FND.9
 - [ ] **TST.4** End-to-end smoke test: install, create admin, write, link, search, upload [0.9] — needs: UI.8, TST.3, OPS.7
+
+## CFG: Configuration and settings
+
+Issue: [#31](https://github.com/dwhagar/spakr/issues/31)
+
+- [ ] **CFG.1** examples/config.json.example listing every option, secrets marked, MySQL marked manual-only [0.1] — needs: FND.2, CFG.2
+- [ ] **CFG.2** Settings registry: each option defined once (key, type, default, secret, web-editable, validation) and used by the loader, API, UI and example [0.1] — needs: FND.2, RES.20
+- [ ] **CFG.3** MySQL credentials: manual-only in config.json; never exposed or editable through the API or UI; clear startup error if missing [0.1] — needs: FND.2, CFG.2
+- [ ] **CFG.4** Settings store: non-secret settings in the database config table with typed access, caching and audit of changes [0.4] — needs: CFG.2, DB.2
+- [ ] **CFG.5** Secrets handling: secrets live in config.json (mode 0600), written atomically by the app, write-only through the API (set or unset, never returned), redacted in logs and audit [0.4] — needs: CFG.2, RES.20
+- [ ] **CFG.6** Live reload of changed settings across WSGI workers and the queue worker [0.4] — needs: CFG.4, CFG.5, QUE.2
+- [ ] **CFG.7** Admin settings screens for every web-editable option, grouped and validated, secret fields write-only [0.8] — needs: CFG.4, CFG.5, AUTH.8, UI.3, UI.13
