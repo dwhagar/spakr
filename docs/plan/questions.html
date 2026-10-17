@@ -29,6 +29,8 @@
 <tr><td>Media embedding</td><td>Markdown-level <code>media:</code> syntax expanded by the renderer into admin-controlled player markup; authors write no HTML</td></tr>
 <tr><td>Media library calls</td><td>subprocess for ffmpeg and ImageMagick (not Wand or ffmpeg-python); Pillow for in-process checks</td></tr>
 <tr><td>Upload size limit</td><td>10 MB for general files and images; 100 MB for video; both admin adjustable</td></tr>
+<tr><td>Version stamp</td><td>MAJOR.MINOR in <code>VERSION</code> by hand; BUILD derived from git by <code>scripts/version.sh</code> (commits on main since VERSION last changed), so no CI is needed</td></tr>
+<tr><td>Search</td><td>One <code>page_search</code> index serves full-page content search and field filters (type, setting, tag, name, type fields); see <a href="../design/database.html">database design</a></td></tr>
 <tr><td>Python</td><td>Distribution Python 3 on each LTS</td></tr>
 </table></div>
 <h2>Questions (all resolved)</h2>
