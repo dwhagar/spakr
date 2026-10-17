@@ -29,6 +29,9 @@
 docs/           archive, research, design, plan (plan is HTML for GitHub Pages)
 examples/       Apache vhost, systemd units, config.json.example
 scripts/        maintenance scripts (backup, migrate, reindex)</pre>
+<h2>Application shell</h2>
+<p>Owner-specified layout (UX category): a <strong>top bar</strong> with tab navigation for tools, settings and account, search, theme and TV toggles, and a hamburger (three lines) at its left; a <strong>left drawer</strong> opened by the hamburger holding the site table of contents and links; a <strong>right rail</strong> holding the page's own table of contents, page actions and related entries; and a <strong>footer</strong> showing the software name and version (from the same source as the health endpoint), the licence (MIT code, CC BY-SA content) and a link to the GitHub repository. On wide screens the drawer is a persistent column that the hamburger collapses; on narrow screens it is an overlay and the rail moves under the page title. Menu items are driven by role (reader, editor, GM, mod, admin); the API still enforces every permission.</p>
+
 <h2>Integrity and recovery</h2>
 <p>Built in from the start (owner decision): every stored artifact has a checksum, parity data protects the content store and media, and every artifact is classed as <em>source of truth</em> or <em>rebuildable</em>. Working classification, to be confirmed by RES.27 and recorded in INT.1:</p>
 <table><tr><th>Data</th><th>Class</th><th>Recovery</th></tr>

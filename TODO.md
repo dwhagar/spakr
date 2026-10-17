@@ -233,7 +233,7 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, UI.13, SEARCH.5, LNK.4
 - [ ] **UI.7** Admin screens: allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
 - [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, UI.13, MED.7
-- [ ] **UI.9** Licence statement in the footer and on edit/upload pages [0.8] — needs: UI.2, UI.13
+- [ ] **UI.9** Licence notice on edit and upload pages (the footer licence is UX.7) [0.8] — needs: UI.2, UI.13, UX.7
 - [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, UI.13, LNK.7
 - [ ] **UI.11** Responsive layout base: mobile-first CSS, fluid grid and navigation, readable at phone width, no horizontal page scroll (standing requirement from the first screen) [0.1] — needs: UI.1, RES.21, RES.23
 - [ ] **UI.12** Theme tokens: light and dark palettes as CSS variables following prefers-color-scheme, plus a user toggle stored server-side so it works without inline script [0.1] — needs: UI.11, RES.21
@@ -248,6 +248,37 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.21** Media detail screen: metadata editor, usage list, variants view and regeneration, replace and rename, visibility, takedown [0.8] — needs: UI.20, MED.12, MED.15, MED.16, MED.21
 - [ ] **UI.22** Media moderation queue and bulk-action screens [0.8] — needs: UI.20, MED.17, MED.19
 - [ ] **UI.23** Admin media screens: storage statistics and quota, duplicates report, prune settings, trigger and status of prune runs [0.8] — needs: UI.20, MED.18, MED.20, MED.28
+
+## UX: Application shell and navigation
+
+Issue: [#56](https://github.com/dwhagar/spakr/issues/56)
+
+Owner decision: a top bar with tab navigation for account, tools and settings and a hamburger (three lines) that opens the site table of contents and links down the left side; the page's own table of contents and immediate menu items (page actions, related entries) down the right side; a footer showing the software name and version, the licence and a link to the GitHub repository (https://github.com/dwhagar/spakr). This replaces the research note that a hamburger was not needed (docs/research/web-devices.html). Built on the web-layer research and the prototype in docs/research/web-prototype.
+
+- [ ] **UX.1** UX design spec in docs/design/ux.html: the four shell regions (top bar, left drawer, right rail, footer), wireframes at phone, foldable, tablet, desktop and TV, menu contents per role, open and close rules [0.1] — needs: RES.21, RES.23, RES.24, UI.13
+- [ ] **UX.2** Shell design tokens as CSS custom properties for light and dark: colours, type scale, spacing, elevation, focus ring, shell dimensions; covered by the contrast check [0.1] — needs: UI.12, UI.17, UX.1
+- [ ] **UX.3** Page template and shell layout: server-rendered base template with skip links and landmarks (header, nav, main, complementary, footer) on a CSS grid with named areas; usable with no JavaScript [0.1] — needs: UI.1, UI.11, FND.3, UX.1, UX.2
+- [ ] **UX.4** Top bar: site name, hamburger button, tab navigation for tools, settings and account, search slot, theme and display toggles; wraps on small screens; current tab marked with aria-current [0.1] — needs: UX.3
+- [ ] **UX.5** Left drawer opened by the hamburger: site table of contents and links from a default menu definition; persistent column on wide screens, overlay on narrow ones; closes on Escape, outside click and link; focus returns to the button [0.1] — needs: UX.3, UX.4
+- [ ] **UX.6** Right rail shell: sections for the page table of contents, page actions and related entries; sticky column on wide screens, collapsible block under the title on narrow ones [0.1] — needs: UX.3
+- [ ] **UX.7** Footer: software name and version taken from the same source as the health endpoint (VERSION and build number), licence statement (MIT code, CC BY-SA content, linking LICENSE and CONTENT-LICENSE.md), and a link to https://github.com/dwhagar/spakr [0.1] — needs: UX.3, API.8
+- [ ] **UX.8** Responsive rules for the shell: drawer and rail collapse patterns at the 62rem breakpoint and a three-column layout on very wide screens, foldable inner and cover screens, container queries, no horizontal page scroll [0.1] — needs: UX.5, UX.6, UI.15
+- [ ] **UX.9** Theme and display toggles in the top bar: light, dark or automatic, and TV mode, stored server-side and applied without inline script [0.1] — needs: UX.4, UI.12
+- [ ] **UX.10** TV mode and remote navigation for the shell: arrow-key focus movement between top bar, drawer, content and rail, overscan-safe margins, thick focus ring [0.1] — needs: UX.5, UX.6, UI.15
+- [ ] **UX.11** Shell accessibility: skip links to content, navigation and page contents, landmarks, heading order, keyboard order top bar, drawer, main, rail, footer, aria-expanded and aria-controls, reduced motion, forced colours [0.1] — needs: UX.5, UX.6, RES.18
+- [ ] **UX.12** Shell tests with the Playwright prototype setup: nine viewports in light and dark, no overflow, drawer open and close, focus order, axe clean, no CSP violations, screenshots [0.1] — needs: UX.8, UX.11, UI.16, TST.1
+- [ ] **UX.13** Page table of contents: built from the rendered headings (ids, h2 to h4) at render time, cached with the page, scroll-spy marking the current section without inline script, long lists collapse [0.3] — needs: UX.6, RND.1, RND.5
+- [ ] **UX.14** Role-aware menus: the menu definition names the permission each item needs; the server renders only items the viewer may use and the API returns the same list; roles reader, editor, GM, mod, admin; hiding is a convenience, the API still enforces permissions [0.4] — needs: UX.5, AUTH.3, API.4, VIS.2
+- [ ] **UX.15** Account menu: sign-in and invitation links when signed out, profile, API keys, theme and sign out when signed in [0.4] — needs: UX.4, UX.14, AUTH.4
+- [ ] **UX.16** Site table of contents from the content: sections by entity type and setting, special pages and admin-editable links, served by /api/v1/nav and cached [0.6] — needs: UX.14, LNK.4
+- [ ] **UX.17** Breadcrumbs above the page title (type, setting, page), server-rendered [0.6] — needs: UX.3, LNK.4
+- [ ] **UX.18** Related entries in the right rail: backlinks, relations by kind, same type and setting, filtered by visibility [0.6] — needs: UX.6, LNK.4, VIS.2
+- [ ] **UX.19** Role and menu tests: each role sees the right items, GM-only pages and tools never appear in menus, TOC or related entries for other roles, keyboard-only and remote navigation script [0.6] — needs: UX.14, UX.18, UX.12
+- [ ] **UX.20** Page actions in the rail and top bar: read, edit, history, revert, visibility, copy link, by role and page state [0.8] — needs: UX.14, UI.2, UI.4, UI.5
+- [ ] **UX.21** Tools menu: new page, recent changes, browse, media library, moderation queue, backups and integrity per role [0.8] — needs: UX.14, UI.10, UI.20
+- [ ] **UX.22** Settings menu: user settings and grouped admin settings (CFG.7 screens), admin items only for admins [0.8] — needs: UX.14, CFG.7
+- [ ] **UX.23** Always-visible search in the top bar with the search-as-you-type combobox; collapses to a button on small screens [0.8] — needs: UX.4, UI.19
+- [ ] **UX.24** Shell guide for developers and admins: how to add a menu item, a tool or a rail section, and how permissions map to items [0.9] — needs: UX.14, UX.21, UX.22
 
 ## OPS: Hardening and operations
 
@@ -295,7 +326,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.28** Checksum design: hash algorithm (SHA-256 versus BLAKE2 in hashlib), manifest format and location, row or table checksums and an audit hash chain in MySQL, migration records, cost of scheduled verification [0.0]
 - [x] **RES.29** MySQL or git for page content: measured saves, concurrency, history, growth, backups and corruption trials; git stays the source of truth (docs/research/content-store-choice.html) [0.0]
 - [ ] **RES.30** Backup design: consistent snapshot of MySQL (mysqldump single-transaction), the git store and media without stopping the site; archive layout and naming; tar.bz2 versus tar.gz speed and size (and parallel bzip2); whether media is full nightly or incremental; par2cmdline on Ubuntu 24.04 and its redundancy defaults; retention scheme; restore order (builds on RES.17 and RES.29) [0.0] — needs: RES.17, RES.29
-- [ ] **RES.31** Secrets and privacy in backups (decision): config.json holds secrets and the database holds password hashes and GM-only content; options are exclude secrets (back up a redacted config), include config unencrypted at 0600, or encrypt archives (age or gpg) and what the off-host copy must do; record the decision [0.0] — needs: RES.20
+- [x] **RES.31** Secrets and privacy in backups (decided): back up a redacted config.json with secrets removed, secrets are re-entered on restore, and archives for the optional off-host copy may be encrypted (age or gpg); the database dump and archives are protected by 0700/0600 permissions [0.0]
 
 ## TST: Testing and sample content
 
@@ -340,18 +371,18 @@ Owner decision: nightly backups of all data stored in /data/backups, each with a
 - [ ] **BAK.3** Directory layout and permissions: /data/backups created at startup, directory 0700 and files 0600 owned by the dedicated user; refuses to run when the path is world-readable or under a web-served path [0.1] — needs: FND.11, BAK.1
 - [ ] **BAK.4** Backup manifest on the INT.3 helper: manifest.json per backup with name, time, software, API and schema versions, format, component list, SHA-256 and size per file, written atomically [0.1] — needs: INT.3, BAK.1
 - [ ] **BAK.5** MySQL dump component: consistent single-transaction dump, credentials passed through a 0600 option file (never on the command line or in logs), schema version recorded [0.1] — needs: DB.2, BAK.2, BAK.4
-- [ ] **BAK.6** Config component by explicit policy (RES.31): default is a redacted copy of config.json plus the list of secret keys to re-enter, with an optional encrypted full copy; the policy is logged in the manifest [0.1] — needs: FND.2, RES.31, BAK.4
+- [ ] **BAK.6** Config component (decided in RES.31): a redacted copy of config.json with secrets removed, plus the list of secret keys to re-enter on restore; the policy is logged in the manifest [0.1] — needs: FND.2, RES.31, BAK.4
 - [ ] **BAK.7** Archive builder: tar.bz2 by default or tar.gz by setting, written to a temporary name and renamed atomically, named spakr-YYYYMMDDTHHMMSSZ-vVERSION [0.1] — needs: BAK.3, BAK.4, BAK.5, BAK.6
 - [ ] **BAK.8** Parity file set per backup with par2, redundancy percent configurable (default 10), created after the archive and listed in the manifest; a clear error when par2 is missing [0.1] — needs: BAK.7, RES.30
 - [ ] **BAK.9** Verify after write: re-read the archive against the manifest checksums, run par2 verify, list the archive; a failed backup is renamed .failed and reported, never counted as good [0.1] — needs: BAK.8
 - [ ] **BAK.10** Consistent snapshot and locking: one backup lock, taken together with the git write lock so no page is half-written in the snapshot; extended to uploads and prune-media by BAK.14 [0.2] — needs: GIT.1, BAK.9
 - [ ] **BAK.11** `spakr backup` command (--now, --format, --redundancy, --dry-run, --json) with exit codes for cron and systemd [0.1] — needs: BAK.9, FND.9
-- [ ] **BAK.12** `spakr restore` command: --list, verify manifest and parity first, repair with par2 when damaged, restore into an empty target, refuse to overwrite without --force, secrets re-entered when the config was redacted [0.1] — needs: BAK.11, DB.4
+- [ ] **BAK.12** `spakr restore` command: --list, verify manifest and parity first, repair with par2 when damaged, restore into an empty target, refuse to overwrite without --force, prompt for the secrets removed from the redacted config [0.1] — needs: BAK.11, DB.4
 - [ ] **BAK.13** Git content store component: snapshot under the write lock (git bundle or repository archive), restored copy checked with git fsck [0.2] — needs: GIT.1, BAK.10, BAK.12
 - [ ] **BAK.14** Media component: originals and manifests (variants optional, off by default because they are rebuildable), coordinated with uploads and prune-media through the shared lock [0.7] — needs: MED.3, MED.24, BAK.10, BAK.12
 - [ ] **BAK.15** Retention and rotation: keep N daily, W weekly and M monthly backups (settings); delete the oldest only after a newer backup verified; never delete the last verified backup; parity files go with their archive [0.2] — needs: BAK.9, BAK.2
 - [ ] **BAK.16** Nightly systemd service and timer in examples/ (dedicated user, idle I/O class, randomised delay, ProtectSystem with /data/backups writable) and install notes [0.2] — needs: BAK.11, FND.6
-- [ ] **BAK.17** Optional off-host copy hook: a configurable command run after a verified backup and given the archive, parity and manifest paths; a failed copy alerts but does not fail the backup; unencrypted copies only when the admin allows them [0.2] — needs: BAK.9, BAK.2, RES.31
+- [ ] **BAK.17** Optional off-host copy hook: a configurable command run after a verified backup and given the archive, parity and manifest paths; a failed copy alerts but does not fail the backup; optional encryption of the copy (age or gpg), and unencrypted copies only when the admin allows them [0.2] — needs: BAK.9, BAK.2, RES.31
 - [ ] **BAK.18** Backup status: last backup time, result, size, verified flag and age kept in a status file and reported in health and status (degraded when older than the stale-after setting), with an API version bump [0.2] — needs: BAK.11, API.8, INT.12
 - [ ] **BAK.19** Failure and staleness alerts through the configured mail relay and the log, throttled to avoid repeats [0.4] — needs: BAK.18, MAIL.1
 - [ ] **BAK.20** Admin backup API: list, status, run now through the queue, verify, delete; admin permission only; restore stays command-line only in 1.0 [0.4] — needs: BAK.18, API.4, QUE.2, AUTH.8
