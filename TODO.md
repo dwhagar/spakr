@@ -145,9 +145,10 @@ Issue: [#20](https://github.com/dwhagar/spakr/issues/20)
 
 - [ ] **LNK.1** Wiki-style links between pages [0.6]
 - [ ] **LNK.2** Backlinks [0.6]
-- [ ] **LNK.3** Relations between pages (needs the relation-vocabulary decision) [0.6]
+- [ ] **LNK.3** Relations between pages, using the fixed admin-managed relation_kind vocabulary (decided) [0.6]
 - [ ] **LNK.4** Browse by type and setting [0.6]
 - [ ] **LNK.5** Tags [0.6]
+- [ ] **LNK.6** Admin API and screen for the relation_kind vocabulary (add, rename, retire, reorder; starter set seeded by migration) [0.6]
 
 ## SEARCH: Content search, SEO and caching
 
