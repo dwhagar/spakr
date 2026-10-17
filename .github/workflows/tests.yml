@@ -1,0 +1,25 @@
+name: tests
+
+# Code tests run only on this schedule (07:00 UTC daily) or when started by hand.
+# Do not add push or pull_request triggers unless specifically asked.
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run tests if any exist
+        run: |
+          if [ -d tests ] || [ -d src/tests ]; then
+            python -m pip install pytest
+            python -m pytest
+          else
+            echo "No tests yet."
+          fi

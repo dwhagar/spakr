@@ -6,7 +6,7 @@
 
 <p>Versions below 1.0 are internal milestones. Each tier is shippable on its own. Dates are intentionally absent.</p>
 <table><tr><th>Tier</th><th>Version</th><th>Theme</th><th>Contents</th></tr>
-<tr><td>0</td><td>0.1</td><td>Foundation</td><td>Python package skeleton, config loading from JSON, MySQL schema migrations, WSGI entry point, CGI shim, Apache vhost example, dev setup script, CI running lint and tests.</td></tr>
+<tr><td>0</td><td>0.1</td><td>Foundation</td><td>Python package skeleton, config loading from JSON, MySQL schema migrations, WSGI entry point, CGI shim, Apache vhost example, dev setup script, CI running lint and tests (scheduled only, see below).</td></tr>
 <tr><td>1</td><td>0.2</td><td>Content store</td><td>Git-backed page repository: create, read, update, history, diff, revert. MySQL index of pages (slug, type, title, setting, current commit).</td></tr>
 <tr><td>1</td><td>0.3</td><td>Rendering</td><td>MultiMarkdown rendering, LaTeX math, HTML sanitizer with admin allowlist, strict output Content-Security-Policy (no inline script or style).</td></tr>
 <tr><td>2</td><td>0.4</td><td>Entity types</td><td>All entity types with their structured fields (see <a href="data-model.html">data model</a>), create/edit forms, free pages, settings tags.</td></tr>
@@ -18,6 +18,8 @@
 <tr><td><strong>6</strong></td><td><strong>1.0</strong></td><td><strong>Release</strong></td><td><strong>Working, functional, usable web site</strong>: everything above deployed on Ubuntu LTS with Apache, MySQL, Redis; an admin can install it from the docs, create accounts, write and revise pages of every type, link and search them, and upload safe files.</td></tr>
 <tr><td>7</td><td>1.1+</td><td>After release</td><td>Ideas, not committed: multiple campaigns per install, structured character sheets and game-system rules, maps, API tokens, JSON/Markdown export bundles, localisation.</td></tr>
 </table>
+<h2>Continuous integration</h2>
+<p>Code-testing CI runs only every morning at 07:00 UTC (<code>.github/workflows/tests.yml</code>, cron <code>0 7 * * *</code>) and can be started by hand. It does not run on pushes or pull requests unless specifically asked.</p>
 <h2>Definition of "usable" for 1.0</h2>
 <ul>
 <li>A new admin can follow the deployment doc and have a running site.</li>
