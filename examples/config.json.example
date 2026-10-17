@@ -5,6 +5,7 @@
     "_note": "MANUAL ONLY. Not editable from the web interface or API.",
     "host": "127.0.0.1",
     "port": 3306,
+    "socket": "",
     "name": "spakr",
     "user": "spakr",
     "password": "CHANGE-ME (secret)"
@@ -33,10 +34,8 @@
   },
 
   "paths": {
-    "content_repo": "/srv/spakr/data/content.git",
-    "media": "/srv/spakr/data/media",
-    "media_originals": "/srv/spakr/data/media-originals",
-    "cache": "/srv/spakr/data/cache"
+    "_note": "Everything lives under data_dir (default /data, git-ignored). content_repo, media, media_originals, cache and uploads default to subfolders of it and rarely need changing.",
+    "data_dir": "/data"
   },
 
   "site": {
