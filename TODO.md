@@ -55,6 +55,7 @@ Issue: [#11](https://github.com/dwhagar/spakr/issues/11)
 - [ ] **API.3** OpenAPI description kept in step with the routes [0.1] — needs: API.2, RES.14
 - [ ] **API.4** Permission decorator used by every route (session or API key) [0.4] — needs: API.1, AUTH.2, AUTH.3
 - [ ] **API.5** Generic CRUD helpers for page-backed resources [0.5] — needs: API.4, ENT.1, GIT.2
+- [ ] **API.6** Request security context: trust HTTPS and client address from Apache (X-Forwarded-Proto) only from a configured trusted proxy; Secure and __Host- cookies; HSTS only when the admin enables it (TLS and certificates are Apache's job) [0.4] — needs: API.1, CFG.4, RND.4
 
 ## DB: Database
 
@@ -102,7 +103,7 @@ Issue: [#15](https://github.com/dwhagar/spakr/issues/15)
 Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 
 - [ ] **AUTH.1** Users and password hashing [0.4] — needs: DB.2, RES.5
-- [ ] **AUTH.2** Login, logout, cookie sessions and CSRF header [0.4] — needs: AUTH.1, API.1
+- [ ] **AUTH.2** Login, logout, cookie sessions and CSRF header [0.4] — needs: AUTH.1, API.1, API.6
 - [ ] **AUTH.3** Roles and permissions: reader, editor, GM, mod, admin [0.4] — needs: AUTH.1, DB.2
 - [ ] **AUTH.4** Invitation flow (7-day tokens) [0.4] — needs: AUTH.1, MAIL.2
 - [ ] **AUTH.5** Password reset flow (1-hour tokens) [0.4] — needs: AUTH.1, MAIL.2

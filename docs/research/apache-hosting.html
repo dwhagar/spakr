@@ -47,7 +47,7 @@ WSGIPassAuthorization On</pre>
 <li><strong>Protocols:</strong> enable <code>h2</code> with the event MPM (<code>Protocols h2 http/1.1</code>); <code>mod_deflate</code> for text.</li>
 <li><strong>Security headers:</strong> the application sets them for dynamic responses so that tests cover them (RND.4); the vhost sets <code>nosniff</code>, HSTS and the strict CSP for static files.</li>
 <li><strong>Denied paths:</strong> <code>.git</code> and <code>*.json</code> are denied in the example already; <code>config.json</code> lives outside the document root anyway (<a href="settings-config.html">RES.20</a>).</li>
-<li><strong>TLS certificates:</strong> certbot (2.9.0 on 24.04) with the Apache plugin, or Apache's built-in <code>mod_md</code>; the install guide picks one (not researched further).</li>
+<li><strong>TLS certificates:</strong> out of scope. The plan assumes Apache2 handles TLS correctly and that a valid domain certificate is installed and renewed by the operator; the install guide does not cover certificates. The application only trusts Apache's HTTPS signal and sets secure cookies (API.6).</li>
 </ul>
 
 <h2>CGI: what stays</h2>
