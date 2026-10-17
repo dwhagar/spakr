@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.1 Markdown and MultiMarkdown rendering - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.1: Markdown and MultiMarkdown rendering</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks RND.1; feeds RND.2, RND.3, LNK.1, GIT.2. Experiments ran on Ubuntu 24.04.5 (Python 3.12 is the system Python; the experiments used a 3.13 virtualenv, which does not change the results).</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Use Python-Markdown 3.11.1</strong> (BSD-3-Clause, pure Python, in a pinned virtualenv as decided in <a href="packaging.html">RES.15</a>) in-process, with these extensions: <code>tables</code>, <code>footnotes</code>, <code>def_list</code>, <code>abbr</code>, <code>attr_list</code>, <code>toc</code>, <code>sane_lists</code>, <code>fenced_code</code> and <code>wikilinks</code> (with our own <code>build_url</code> for <code>[[Page Name]]</code>, LNK.1). Add <code>pymdownx.tilde</code> and <code>pymdownx.caret</code> from pymdown-extensions 12.3 (MIT) so MultiMarkdown-style <code>H~2~O</code> and <code>E=mc^2^</code> work.</li>
+<li><strong>This is a MultiMarkdown-compatible dialect, not MultiMarkdown itself.</strong> No maintained MultiMarkdown engine is usable on the platform (details below). The dialect is documented for editors (DOC.4) and the differences are listed on this page.</li>
+<li><strong>Structured page data is YAML front matter</strong> (<code>---</code> block, read with PyYAML 6.0.3 <code>safe_load</code>, MIT), not MultiMarkdown <code>Key: value</code> metadata. Entity fields are lists and nested values, which the MMD block cannot express. The front matter is stripped before rendering.</li>
+<li><strong>Never run the output without the sanitiser.</strong> Python-Markdown passes raw HTML through (measured: <code>&lt;script&gt;</code> and <code>onclick</code> survive). The pipeline is Markdown, then sanitise (<a href="html-sanitising.html">RES.3</a>), then swap in trusted math and media markup (<a href="math-rendering.html">RES.2</a>). A working prototype is in <code>docs/research/poc/render_poc.py</code>.</li>
+<li><strong>No MultiMarkdown file transclusion</strong> (<code>{{file}}</code>): it reads files from the server. Excluded on purpose.</li>
+</ul>
+
+<h2>What was compared</h2>
+<table><tr><th>Option</th><th>Version and licence</th><th>Speed (one 1 KB page)</th><th>Result</th></tr>
+<tr><td><strong>Python-Markdown</strong> + extensions</td><td>3.11.1 on PyPI (released 2026-10-13), BSD-3; apt has 3.5.2</td><td>2.7 ms in-process</td><td>Tables, footnotes, definition lists, abbreviations, header ids, fenced code, metadata all correct. No table captions, no <code>~sub~</code> without pymdownx, <code>*[ABBR]:</code> works, nested abbr quirk noted below.</td></tr>
+<tr><td>pandoc <code>-f markdown_mmd</code></td><td>3.1.3 from apt (GPL-2.0-or-later)</td><td>129 ms (process start, one call per page)</td><td>Closest to MMD syntax (title block, sub/superscript, footnotes, definition lists) but: it consumed the <code>Title:</code> metadata, did not parse table captions (<code>[Attributes]</code> stayed as text), printed translation warnings on every run, and passes raw HTML. Run with <code>--sandbox</code> if used at all.</td></tr>
+<tr><td>Perl <code>Text::MultiMarkdown</code> (<code>multimarkdown</code> command)</td><td>1.000035 from apt (<code>libtext-multimarkdown-perl</code>)</td><td>not timed (Perl process per page)</td><td>Real MMD 1 behaviour including table captions, but it is MultiMarkdown 1 on Markdown.pl: no fenced code (the <code>```python</code> block became inline code), and a list without a blank line before it was not parsed.</td></tr>
+<tr><td>MultiMarkdown 6 (C, <code>libmultimarkdown</code>)</td><td>not packaged: <code>apt-cache policy multimarkdown libmultimarkdown-dev</code> shows no candidate on 24.04</td><td>n/a</td><td>Would be built from source and called as a subprocess or via ctypes. <em>Not verified:</em> upstream release date and licence, because GitHub access for repositories outside this project is blocked in this session. Not worth a source build we would have to maintain for every LTS.</td></tr>
+<tr><td>markdown-it-py + plugins</td><td>4.2.0 (MIT), mdit-py-plugins 0.6.1</td><td>1.2 ms</td><td>Strict CommonMark; fast and well kept, but definition lists, abbreviations and attribute lists live in separate plugins of varying maturity. Not MMD-like.</td></tr>
+<tr><td>mistune</td><td>3.3.4 (BSD-3)</td><td>1.4 ms</td><td>Fast; plugin set is smaller than Python-Markdown's.</td></tr>
+</table>
+<p>Timings are mean of 200 runs after warm-up, on the cloud container used for this thread (relative numbers matter, not the absolute ones). Python-Markdown is 2 to 3 ms slower than the fastest parsers, which is irrelevant behind the rendered-page cache (<a href="caching.html">caching</a>).</p>
+
+<h2>MultiMarkdown features and what we do with them</h2>
+<table><tr><th>MMD feature</th><th>In our dialect</th></tr>
+<tr><td>Tables, footnotes, definition lists, abbreviations, header ids, <code>[TOC]</code></td><td>Yes (extensions above). Table of contents uses <code>[TOC]</code>, not MMD's <code>{{TOC}}</code>.</td></tr>
+<tr><td>Subscript and superscript <code>~ ^</code></td><td>Yes, via pymdownx.tilde and caret (tested: <code>H&lt;sub&gt;2&lt;/sub&gt;O</code>, <code>E=mc&lt;sup&gt;2&lt;/sup&gt;</code>).</td></tr>
+<tr><td>Math <code>\\(...\\)</code> and <code>\\[...\\]</code></td><td>Yes, hidden from the parser and rendered server-side (RES.2). Both one and two backslashes are accepted.</td></tr>
+<tr><td>Metadata block <code>Title: x</code></td><td>Replaced by YAML front matter. Python-Markdown's <code>meta</code> extension can read the MMD block, so importing old MMD files is possible later (OPS.6).</td></tr>
+<tr><td>Table captions <code>[Caption]</code>, column spans <code>||</code></td><td>Not in stock Python-Markdown. Optional: a small custom extension (about 40 lines) if editors ask. Not planned for 1.0.</td></tr>
+<tr><td>CriticMarkup, citations, glossary, automatic cross-references</td><td>No. Page history and diffs (GIT.3) replace CriticMarkup.</td></tr>
+<tr><td>File transclusion <code>{{file}}</code></td><td>Never (reads server files).</td></tr>
+<tr><td>Raw HTML</td><td>Allowed in the source but sanitised afterwards; only admin-approved tags and attributes survive.</td></tr>
+</table>
+
+<h2>Measured quirks to handle in RND.1</h2>
+<ul>
+<li><code>*[HTML]: Hyper Text Markup Language</code> abbreviations also wrapped a literal <code>&lt;abbr&gt;</code> the author had written, giving nested <code>&lt;abbr&gt;&lt;abbr&gt;</code>. Harmless; add a test.</li>
+<li>Python-Markdown prints footnote links with <code>class="footnote-ref"</code> and a back-reference with a <code>title</code>; the sanitiser's attribute rules must keep <code>id</code>, <code>href</code> and the footnote classes (see RES.3).</li>
+<li>Output uses <code>&lt;table&gt;</code> with inline <code>style="text-align: right"</code> for aligned columns. Our CSP forbids inline styles, so a tree processor must turn alignment into classes (<code>class="align-right"</code>). Same for pandoc. Tested behaviour of the CSP is on the <a href="front-end.html">front-end page</a>.</li>
+<li>Wiki links: the built-in <code>wikilinks</code> extension takes a <code>build_url</code> callable; the prototype maps <code>[[Meridian Fleet]]</code> to <code>/wiki/meridian-fleet</code>. Resolving the slug against the page index and marking missing pages (red links) belongs in LNK.1, after rendering.</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Upstream MultiMarkdown 6 status (see table). If the owner wants true MMD 6, a spike is needed with network access to the upstream project.</li>
+<li>Python-Markdown 3.11.1 on Python 3.12 specifically: it requires Python 3.11 or newer on PyPI, so it is supported, but the test runs used 3.13.</li>
+</ul>
+
+<h2>Decision for the owner</h2>
+<div class="q"><p><strong>Question:</strong> the brief says "MultiMarkdown if possible". Accept an MMD-compatible dialect on Python-Markdown (recommended), or require the real MultiMarkdown 6 engine?</p>
+<p>Options: (a) <strong>dialect on Python-Markdown, recommended</strong>: in-process, fast, maintained, safe to extend; most MMD documents render the same; table captions and CriticMarkup differ. (b) Build MultiMarkdown 6 from source: exact MMD output, but we maintain a build on every LTS and still need the sanitiser. Default taken: (a).</p></div>
+</main></body></html>

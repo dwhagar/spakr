@@ -1,0 +1,24 @@
+<!--
+  spakr ImageMagick policy (ImageMagick 6.9.12 as shipped by Ubuntu 24.04).
+  Use it only for the media worker, without editing /etc: set
+    MAGICK_CONFIGURE_PATH=/etc/spakr/imagemagick
+  in the worker's environment and put this file there as policy.xml.
+  Allow-list of coders (module domain in ImageMagick 6): everything off except PNG, JPEG, GIF, WEBP.
+  Tested in docs/research/media-tools.html. Always also pass an explicit format prefix, for example jpeg:in.jpg.
+-->
+<policymap>
+  <policy domain="Undefined" rights="none"/>
+  <policy domain="resource" name="memory" value="256MiB"/>
+  <policy domain="resource" name="map" value="512MiB"/>
+  <policy domain="resource" name="area" value="64MP"/>
+  <policy domain="resource" name="disk" value="1GiB"/>
+  <policy domain="resource" name="width" value="16KP"/>
+  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="time" value="30"/>
+  <policy domain="resource" name="thread" value="2"/>
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+  <policy domain="module" rights="none" pattern="*"/>
+  <policy domain="path" rights="none" pattern="@*"/>
+  <policy domain="module" rights="read|write" pattern="{PNG,JPEG,GIF,WEBP}"/>
+</policymap>
