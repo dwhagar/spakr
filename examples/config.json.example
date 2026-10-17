@@ -33,10 +33,12 @@
   },
 
   "paths": {
-    "content_repo": "/srv/spakr/data/content.git",
-    "media": "/srv/spakr/data/media",
-    "media_originals": "/srv/spakr/data/media-originals",
-    "cache": "/srv/spakr/data/cache"
+    "_note": "Relative to the project root. All data lives under /data, which is git-ignored.",
+    "data_dir": "data",
+    "content_repo": "data/content.git",
+    "media": "data/media",
+    "media_originals": "data/media-originals",
+    "cache": "data/cache"
   },
 
   "site": {

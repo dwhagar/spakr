@@ -9,6 +9,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 - New suggested items: AUTH.12 (user data export), MED.9 (optional ClamAV scan), MED.10 (captions and transcripts), DOC.7 (privacy page).
 
 ### Changed
+- Decisions for the first build: Python 3.12 required (FND.10); integer database and API versions that count up on every change (DB.5, API.7), reported with the software version by the health and status endpoint (API.8); all data under git-ignored `/data` (FND.11); graceful failure without a config file (CFG.8). `/data/` added to `.gitignore`; config example paths moved under `data`.
 - Web UI layer research added for Research C: RES.21 to RES.24 (CSS and design system, Node.js justification, device range from phone and foldable to TV, component approach) and UI.15 (TV and foldable layouts), UI.16 (device test matrix); UI.1, UI.11, UI.12 and UI.13 now need the matching research.
 - Assumption recorded: Apache2 handles TLS and a valid domain certificate is in place; no certificate handling in the app. Added API.6 (trust Apache HTTPS signal, Secure and __Host- cookies, HSTS only if the admin enables it).
 - CSRF design is a synchronizer token tied to the server session plus a Fetch Metadata check, replacing the double-submit token (RES.5, AUTH.2); invitation and reset tokens travel in the URL fragment and are consumed by a POST (AUTH.4, AUTH.5); API keys cannot manage keys or account security (AUTH.6).
