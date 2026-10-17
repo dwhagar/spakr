@@ -4,6 +4,9 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 
 ## [Unreleased]
 
+### Changed
+- Relation types are a fixed, admin-managed vocabulary (`relation_kind` table), not free-form labels; added LNK.6 for its admin API (LNK.3).
+
 ## [0.0.0] - 2026-10-17
 
 First stamped version. Planning and process only; there is no application code yet.
