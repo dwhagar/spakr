@@ -4,6 +4,9 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 
 ## [Unreleased]
 
+### Added
+- Standing requirement: every screen is responsive and has light and dark modes from the start. Foundation items UI.11 (responsive layout base), UI.12 (light/dark theme tokens with a user toggle), UI.13 (acceptance checklist for every UI item), UI.14 (themed tables, code and media players), and DOC.6 (plan pages responsive with dark mode, done). Later UI items now need UI.13.
+
 ### Changed
 - Plan reworked as a dependency tree: 140 TODO items, each naming the ids it needs, in phases 0.0 to 0.9 matched to version numbers. 0.9 is now the pre-release working version; 0.1 to 0.8 are building blocks; 1.0 is the release (DOC.1).
 - Preview endpoint (RND.6) moved to phase 0.5 because it needs the permission decorator.
