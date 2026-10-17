@@ -28,7 +28,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 
 - [x] **DOC.1** Plan rewritten as tiers 0.0 to 0.9 with TODO ids [0.0]
 - [ ] **DOC.2** Enable GitHub Pages from /docs (owner action in repository settings) [0.0]
-- [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5, CFG.1
+- [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5, CFG.1, BAK.27
 - [ ] **DOC.4** Editor guide: writing pages, links, media syntax, visibility [0.9] — needs: UI.4, MED.7, LNK.1
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
@@ -72,7 +72,7 @@ Issue: [#12](https://github.com/dwhagar/spakr/issues/12)
 - [x] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
 - [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, type tables, page_search, media, html_allowlist, upload_policy
 - [ ] **DB.3** Command to rebuild all derived MySQL data (page index, search tables, relations) from the git content store; resumable, dry-run option [0.2] — needs: DB.2, GIT.5, SEARCH.2, INT.1, GIT.9
-- [ ] **DB.4** Database backup and restore script [0.9] — needs: DB.2
+- [ ] **DB.4** Database restore into an empty schema with a schema-version check and integrity verification, used by `spakr restore` (the nightly dump is BAK.5) [0.1] — needs: DB.2, BAK.5
 - [x] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
 
 ## QUE: Task queue
@@ -257,7 +257,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, UI.21, RES.18, UI.13
-- [ ] **OPS.5** Backup and restore commands (spakr backup, spakr restore) covering git store, MySQL, media, hash manifests and parity data [0.9] — needs: DB.4, GIT.1, MED.3, RES.17, INT.10
+- [ ] **OPS.5** Backup acceptance on a clean install: the latest nightly backup, with parity, restores into a fresh server and matches the original (delivered by the BAK category) [0.9] — needs: BAK.12, BAK.13, BAK.14, BAK.26
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
 
@@ -294,6 +294,8 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.27** Source of truth versus rebuildable: classify every table and file; what lives only in MySQL (accounts, settings, audit, invitations) and so needs a checksummed journal; what is rebuilt from the git content store and media originals; depends on the MySQL-versus-git findings (done: RES.29) [0.0]
 - [ ] **RES.28** Checksum design: hash algorithm (SHA-256 versus BLAKE2 in hashlib), manifest format and location, row or table checksums and an audit hash chain in MySQL, migration records, cost of scheduled verification [0.0]
 - [x] **RES.29** MySQL or git for page content: measured saves, concurrency, history, growth, backups and corruption trials; git stays the source of truth (docs/research/content-store-choice.html) [0.0]
+- [ ] **RES.30** Backup design: consistent snapshot of MySQL (mysqldump single-transaction), the git store and media without stopping the site; archive layout and naming; tar.bz2 versus tar.gz speed and size (and parallel bzip2); whether media is full nightly or incremental; par2cmdline on Ubuntu 24.04 and its redundancy defaults; retention scheme; restore order (builds on RES.17 and RES.29) [0.0] — needs: RES.17, RES.29
+- [ ] **RES.31** Secrets and privacy in backups (decision): config.json holds secrets and the database holds password hashes and GM-only content; options are exclude secrets (back up a redacted config), include config unencrypted at 0600, or encrypt archives (age or gpg) and what the off-host copy must do; record the decision [0.0] — needs: RES.20
 
 ## TST: Testing and sample content
 
@@ -322,10 +324,44 @@ Principle (owner decision): the system is built from the ground up with checksum
 - [ ] **INT.10** `spakr verify` command: runs every check (git fsck, manifests, row checksums, migration hashes, parity), human and JSON reports, exit codes, repair plan output [0.2] — needs: INT.3, INT.4, FND.9
 - [ ] **INT.11** Scheduled verification: systemd service and timer in examples/ (light daily, full weekly), results stored and the admin notified on failure [0.7] — needs: INT.10, FND.6, INT.6
 - [ ] **INT.12** Health and status report integrity state (ok, degraded, corrupt, last verified) and bump the API version for the new fields [0.2] — needs: INT.10, API.8
-- [ ] **INT.13** `spakr repair`: repair from parity, restore from backup, quarantine corrupt files, rebuild derived data; dry-run by default, audit entry per run [0.7] — needs: INT.10, INT.5, INT.7, INT.8, INT.9, AUTH.7
+- [ ] **INT.13** `spakr repair`: repair from parity, restore from backup, quarantine corrupt files, rebuild derived data; dry-run by default, audit entry per run [0.7] — needs: INT.10, INT.5, INT.7, INT.8, INT.9, AUTH.7, BAK.12
 - [ ] **INT.14** Admin integrity screen: status, last verification, run verify, review repair plan [0.8] — needs: INT.12, INT.13, UI.7
 - [ ] **INT.15** Damage-and-recover tests: corrupt git objects, drop the MySQL database, flip bytes in media, truncate manifests; assert detection and full recovery [0.7] — needs: INT.13, INT.5, INT.8
-- [ ] **INT.16** Recovery guide for admins: what is checked, how to read a verify report, how to repair and rebuild, how backups and parity fit together [0.9] — needs: INT.13, OPS.5
+- [ ] **INT.16** Recovery guide for admins: what is checked, how to read a verify report, how to repair and rebuild, how backups and parity fit together [0.9] — needs: INT.13, OPS.5, BAK.27
+
+## BAK: Backups and recovery pipeline
+
+Issue: [#54](https://github.com/dwhagar/spakr/issues/54)
+
+Owner decision: nightly backups of all data stored in /data/backups, each with a parity file; tar.bz2 by default, gz as an option. Built on the INT category (checksums, manifests, parity) and ordered so the basics (settings, layout, manifest, DB dump, config policy, restore) land first.
+
+- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1
+- [ ] **BAK.2** Backup settings in config.json.example and the settings registry: enabled, directory (default /data/backups), format bz2 (default) or gz, parity redundancy percent, retention, off-host command, alert on failure, stale-after hours; validated [0.1] — needs: CFG.1, CFG.2, BAK.1
+- [ ] **BAK.3** Directory layout and permissions: /data/backups created at startup, directory 0700 and files 0600 owned by the dedicated user; refuses to run when the path is world-readable or under a web-served path [0.1] — needs: FND.11, BAK.1
+- [ ] **BAK.4** Backup manifest on the INT.3 helper: manifest.json per backup with name, time, software, API and schema versions, format, component list, SHA-256 and size per file, written atomically [0.1] — needs: INT.3, BAK.1
+- [ ] **BAK.5** MySQL dump component: consistent single-transaction dump, credentials passed through a 0600 option file (never on the command line or in logs), schema version recorded [0.1] — needs: DB.2, BAK.2, BAK.4
+- [ ] **BAK.6** Config component by explicit policy (RES.31): default is a redacted copy of config.json plus the list of secret keys to re-enter, with an optional encrypted full copy; the policy is logged in the manifest [0.1] — needs: FND.2, RES.31, BAK.4
+- [ ] **BAK.7** Archive builder: tar.bz2 by default or tar.gz by setting, written to a temporary name and renamed atomically, named spakr-YYYYMMDDTHHMMSSZ-vVERSION [0.1] — needs: BAK.3, BAK.4, BAK.5, BAK.6
+- [ ] **BAK.8** Parity file set per backup with par2, redundancy percent configurable (default 10), created after the archive and listed in the manifest; a clear error when par2 is missing [0.1] — needs: BAK.7, RES.30
+- [ ] **BAK.9** Verify after write: re-read the archive against the manifest checksums, run par2 verify, list the archive; a failed backup is renamed .failed and reported, never counted as good [0.1] — needs: BAK.8
+- [ ] **BAK.10** Consistent snapshot and locking: one backup lock, taken together with the git write lock so no page is half-written in the snapshot; extended to uploads and prune-media by BAK.14 [0.2] — needs: GIT.1, BAK.9
+- [ ] **BAK.11** `spakr backup` command (--now, --format, --redundancy, --dry-run, --json) with exit codes for cron and systemd [0.1] — needs: BAK.9, FND.9
+- [ ] **BAK.12** `spakr restore` command: --list, verify manifest and parity first, repair with par2 when damaged, restore into an empty target, refuse to overwrite without --force, secrets re-entered when the config was redacted [0.1] — needs: BAK.11, DB.4
+- [ ] **BAK.13** Git content store component: snapshot under the write lock (git bundle or repository archive), restored copy checked with git fsck [0.2] — needs: GIT.1, BAK.10, BAK.12
+- [ ] **BAK.14** Media component: originals and manifests (variants optional, off by default because they are rebuildable), coordinated with uploads and prune-media through the shared lock [0.7] — needs: MED.3, MED.24, BAK.10, BAK.12
+- [ ] **BAK.15** Retention and rotation: keep N daily, W weekly and M monthly backups (settings); delete the oldest only after a newer backup verified; never delete the last verified backup; parity files go with their archive [0.2] — needs: BAK.9, BAK.2
+- [ ] **BAK.16** Nightly systemd service and timer in examples/ (dedicated user, idle I/O class, randomised delay, ProtectSystem with /data/backups writable) and install notes [0.2] — needs: BAK.11, FND.6
+- [ ] **BAK.17** Optional off-host copy hook: a configurable command run after a verified backup and given the archive, parity and manifest paths; a failed copy alerts but does not fail the backup; unencrypted copies only when the admin allows them [0.2] — needs: BAK.9, BAK.2, RES.31
+- [ ] **BAK.18** Backup status: last backup time, result, size, verified flag and age kept in a status file and reported in health and status (degraded when older than the stale-after setting), with an API version bump [0.2] — needs: BAK.11, API.8, INT.12
+- [ ] **BAK.19** Failure and staleness alerts through the configured mail relay and the log, throttled to avoid repeats [0.4] — needs: BAK.18, MAIL.1
+- [ ] **BAK.20** Admin backup API: list, status, run now through the queue, verify, delete; admin permission only; restore stays command-line only in 1.0 [0.4] — needs: BAK.18, API.4, QUE.2, AUTH.8
+- [ ] **BAK.21** Security hardening: no backups under a web-served path, Apache example denies /data, backup permission and ownership checks in `spakr verify`, dedicated user documented, no secrets in command lines or logs [0.2] — needs: BAK.3, FND.6, INT.10
+- [ ] **BAK.22** Admin backup screen: list, status, last result, run now, verify, restore instructions [0.8] — needs: BAK.20, UI.7
+- [ ] **BAK.23** Round-trip tests: backup, restore into fresh directories and schema, compare content, hashes and versions, for tar.bz2 and tar.gz; extended as BAK.13 and BAK.14 land [0.1] — needs: BAK.12
+- [ ] **BAK.24** Damage-and-repair tests: flip bytes in and truncate the archive, damage the manifest, remove the parity file; assert par2 repair, clear failure messages and a successful restore after repair [0.2] — needs: BAK.8, BAK.23, BAK.13
+- [ ] **BAK.25** `spakr verify` and `spakr repair` cover the backup set: checksums and parity of the latest backups, repair of a damaged backup from parity, and restore from backup as a repair source [0.2] — needs: INT.10, BAK.8
+- [ ] **BAK.26** Restore drill: `spakr restore --drill` restores the latest backup into scratch space and compares it with the live data, run monthly by a timer, result kept in the status [0.7] — needs: BAK.14, BAK.16
+- [ ] **BAK.27** Backup and recovery guide: settings, timer install, restore steps, secrets policy, off-host copy, retention, hardening, the drill [0.9] — needs: BAK.22, BAK.26, BAK.17
 
 ## CFG: Configuration and settings
 
