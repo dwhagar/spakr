@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media processing research - spakr</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="media-processing.html">Research: media processing</a></nav><main>
+<h1>Media processing research</h1>
+<p>Question: which tools and Python libraries do we need to process image and video uploads with ffmpeg and ImageMagick, and what else does the stack need? Findings come from established practice and package knowledge; versions should be re-checked against Ubuntu 24.04 when 0.1 starts.</p>
+<h2>Approach</h2>
+<p>Uploads are never processed in the web request. The upload handler stores the file in quarantine and enqueues a Redis task; a worker validates and transcodes it, then publishes or rejects it. The command-line tools run as <strong>subprocesses with an argument list (no shell)</strong>, resource limits and timeouts, as an unprivileged user, because both tools have long histories of parser vulnerabilities.</p>
+<h2>System packages (Ubuntu apt)</h2>
+<table><tr><th>Package</th><th>Use</th></tr>
+<tr><td><code>ffmpeg</code> (includes <code>ffprobe</code>)</td><td>Probe and transcode video and audio, extract poster frames</td></tr>
+<tr><td><code>imagemagick</code></td><td>Resize, strip metadata, convert images, make thumbnails</td></tr>
+<tr><td><code>libmagic1</code></td><td>Content-based file type sniffing</td></tr>
+<tr><td><code>clamav</code> (optional)</td><td>Virus scan before publishing</td></tr>
+</table>
+<p>ImageMagick on Ubuntu ships a <code>policy.xml</code>; we tighten it (disable risky coders such as MVG, MSL, URL, HTTP, and text/script-reading coders, set memory, map, disk and time limits). Run it as <code>magick</code> or <code>convert</code> depending on the packaged version.</p>
+<h2>Python libraries</h2>
+<table><tr><th>Need</th><th>Recommended</th><th>Notes</th></tr>
+<tr><td>Call ffmpeg / ffprobe</td><td>Standard library <code>subprocess</code> (with <code>ffprobe -print_format json</code>)</td><td>Preferred over wrappers: full control of arguments and timeouts, no extra dependency. <code>ffmpeg-python</code> is only a command builder and is lightly maintained.</td></tr>
+<tr><td>Call ImageMagick</td><td>Standard library <code>subprocess</code></td><td>Preferred over <code>Wand</code> (ctypes binding to libMagickWand) so a crash cannot take down the worker process and limits apply per command.</td></tr>
+<tr><td>Image checks and thumbnails in-process</td><td><code>Pillow</code></td><td>Use to verify that an image decodes, check dimensions (decompression-bomb limit), and as a fallback; ImageMagick is for conversions Pillow lacks.</td></tr>
+<tr><td>File type sniffing</td><td><code>python-magic</code> (needs <code>libmagic1</code>)</td><td>Compare sniffed MIME with extension; reject mismatches.</td></tr>
+<tr><td>Task queue</td><td><code>redis</code> and <code>rq</code></td><td>Matches the plan; RQ is a Redis library with a simple worker. Alternatives: Celery (heavier), Dramatiq.</td></tr>
+<tr><td>MySQL</td><td><code>PyMySQL</code> (pure Python) or <code>mysqlclient</code> (C, faster)</td><td>Default: <code>mysqlclient</code> if build deps are acceptable, else <code>PyMySQL</code>.</td></tr>
+<tr><td>Templates</td><td><code>Jinja2</code></td><td>Autoescaping on.</td></tr>
+<tr><td>HTML sanitising</td><td><code>nh3</code> (Rust binding to ammonia) with an allowlist; <code>bleach</code> is deprecated</td><td>Allowlist comes from the admin-approved table.</td></tr>
+<tr><td>Markdown fallback</td><td><code>markdown-it-py</code> or <code>markdown</code></td><td>Only if the <code>multimarkdown</code> binary is unavailable.</td></tr>
+<tr><td>Math to static markup</td><td>Evaluate: <code>latex2mathml</code> (pure Python), or KaTeX via Node at build/worker time</td><td>Decide in 0.3; MathML needs no client script.</td></tr>
+<tr><td>Git</td><td>Subprocess to <code>git</code>; <code>GitPython</code> or <code>pygit2</code> are options</td><td>Default: subprocess, same reasoning as above.</td></tr>
+<tr><td>Passwords</td><td><code>argon2-cffi</code></td><td></td></tr>
+<tr><td>WSGI</td><td><code>mod_wsgi</code> from apt (<code>libapache2-mod-wsgi-py3</code>)</td><td>Must match the system Python; use a venv via <code>python-home</code>.</td></tr>
+<tr><td>Config, testing</td><td>standard <code>json</code>; <code>pytest</code>, <code>ruff</code></td><td></td></tr>
+</table>
+<h2>Processing rules per upload class</h2>
+<table><tr><th>Class</th><th>Pipeline</th></tr>
+<tr><td>Images (PNG, JPEG, GIF, WebP)</td><td>Sniff, Pillow decode check and pixel limit, ImageMagick re-encode with metadata stripped (<code>-strip</code>, auto-orient), make thumbnails. The re-encoded copy is what gets served.</td></tr>
+<tr><td>Video (default allowed: MP4, WebM, MOV input)</td><td><code>ffprobe</code> check (streams, duration and size limits, no external references), ffmpeg transcode to H.264/AAC MP4 and optionally VP9/Opus WebM, metadata stripped, poster frame extracted. Limit protocols with <code>-protocol_whitelist file</code>. Original discarded or kept in quarantine by setting.</td></tr>
+<tr><td>Audio</td><td>Off by default; if enabled, same ffprobe/ffmpeg path.</td></tr>
+<tr><td>SVG</td><td>Off by default (can carry script). If enabled, rasterise to PNG rather than serving the SVG.</td></tr>
+<tr><td>PDF and others</td><td>Off by default; admin may enable. Not processed by ImageMagick (Ghostscript policy stays disabled).</td></tr>
+</table>
+<h2>Risks and mitigations</h2>
+<ul>
+<li>Parser exploits: unprivileged user, no network (systemd sandboxing or <code>unshare</code>), CPU/memory/time limits, current distribution security updates.</li>
+<li>Decompression bombs and huge frame counts: Pillow <code>MAX_IMAGE_PIXELS</code>, ImageMagick policy limits, ffprobe-based checks before transcoding.</li>
+<li>Long jobs: run in the worker with a hard timeout; the UI shows "processing" until the task completes.</li>
+<li>Failed files stay in quarantine and an admin can review them (the existing override path).</li>
+</ul>
+<h2>Recommendation</h2>
+<p>Use apt <code>ffmpeg</code> and <code>imagemagick</code> via subprocess, plus Python <code>Pillow</code>, <code>python-magic</code>, <code>redis</code>, <code>rq</code>, <code>Jinja2</code>, <code>nh3</code>, <code>argon2-cffi</code>, and a MySQL driver. Avoid Wand and ffmpeg-python for isolation and fewer dependencies. Open item: choose the math renderer in 0.3.</p>
+</main></body></html>

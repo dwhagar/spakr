@@ -29,9 +29,10 @@
 </ul>
 <h2>Uploads</h2>
 <ul>
-<li><strong>Safe by default</strong>: images (PNG, JPEG, GIF, WebP), plain text, Markdown, CSV. SVG is excluded by default because it can carry script.</li>
+<li><strong>Safe by default</strong>: images (PNG, JPEG, GIF, WebP), video (MP4, WebM, MOV input), plain text, Markdown, CSV. SVG is excluded by default because it can carry script.</li>
 <li>Admin toggles can enable additional classes such as PDF, audio, video, archives.</li>
 <li><strong>Admin override</strong>: a file outside the enabled list lands in quarantine and is only published after an admin approves it individually.</li>
+<li><strong>Processing</strong>: images and video are never served as uploaded. A Redis task runs ImageMagick (images) and ffmpeg (video) as sandboxed subprocesses to re-encode, strip metadata and create thumbnails and poster frames; the processed copy is published only if every check passes. See <a href="../research/media-processing.html">media processing research</a>.</li>
 <li>Checks: extension and sniffed MIME must agree, size limit, files renamed to their content hash, stored outside the web root and served by the app with <code>X-Content-Type-Options: nosniff</code> and <code>Content-Disposition</code> set appropriately, optional ClamAV scan in the worker.</li>
 </ul>
 <h2>Other security basics</h2>
