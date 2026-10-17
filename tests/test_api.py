@@ -169,3 +169,19 @@ def test_openapi_served(client):
     assert spec["openapi"].startswith("3.1")
     assert "/api/v1/health" in spec["paths"]
     json.dumps(spec)
+
+
+def test_database_version_reported_when_db_layer_present(monkeypatch):
+    import sys
+    import types
+
+    fake = types.ModuleType("spakr.db")
+    fake.SCHEMA_VERSION = 3
+    fake.create_db_engine = lambda settings: object()
+    fake.get_schema_version = lambda engine: 2
+    monkeypatch.setitem(sys.modules, "spakr.db", fake)
+    response = create_app(config={}).test_client().get("/api/v1/health")
+    assert response.status_code == 503
+    body = response.get_json()
+    assert body["status"] == "degraded"
+    assert body["database_version"] == {"expected": 3, "current": 2, "state": "outdated"}
