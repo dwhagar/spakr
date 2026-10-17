@@ -37,6 +37,7 @@ scripts/        maintenance scripts (backup, migrate, reindex)</pre>
 <tr><td>Accounts, settings, audit, invitations (MySQL only)</td><td>Source of truth</td><td>Checksummed journal (INT.9), row checksums, backups</td></tr>
 <tr><td>Page index, search tables, relations, usage index</td><td>Rebuildable</td><td>Rebuilt from the content store (DB.3)</td></tr>
 <tr><td>Media variants, rendered-page cache</td><td>Rebuildable</td><td>Regenerated from originals and pages (INT.5)</td></tr></table>
+<p><strong>Backups</strong> (BAK category): a nightly systemd timer runs <code>spakr backup</code>, which writes a consistent snapshot (MySQL dump, git content store, media originals, config by explicit secrets policy) to <code>/data/backups</code> as tar.bz2 (tar.gz by setting) with a checksum manifest and a par2 parity set per backup, verifies it after writing, rotates old backups and reports status in health and status. <code>spakr restore</code> verifies and repairs the archive from parity before restoring. The directory is mode 0700, owned by a dedicated user and never web-served.</p>
 <p>Tools: <code>spakr verify</code> (also scheduled and shown in health and status), <code>spakr repair</code> and the damage-and-recover tests. See the INT category in <a href="tiers.html">the tiers</a>.</p>
 
 <h2>Layers</h2>
