@@ -39,7 +39,7 @@ Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 - [x] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
 - [x] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
 - [ ] **FND.3** WSGI entry point (daemon mode, pass-authorization on) and the small CGI shim (health and maintenance only) [0.1] — needs: FND.1, API.1, RES.16
-- [ ] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
+- [x] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
 - [ ] **FND.5** Dev setup script for Ubuntu 24.04 [0.1] — needs: FND.1, RES.15
 - [ ] **FND.6** Apache vhost and systemd unit examples in examples/ [0.1] — needs: FND.3, QUE.2, RES.16
 - [ ] **FND.7** Lint, format and test tooling; tests workflow stays on the 07:00 UTC schedule only, and the daily run opens an issue when it fails [0.1] — needs: FND.1
@@ -52,13 +52,13 @@ Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 
 Issue: [#11](https://github.com/dwhagar/spakr/issues/11)
 
-- [ ] **API.1** Flask app factory and /api/v1 skeleton with health endpoint [0.1] — needs: FND.1, FND.2
+- [x] **API.1** Flask app factory and /api/v1 skeleton with health endpoint [0.1] — needs: FND.1, FND.2
 - [ ] **API.2** Error format, pagination and filtering conventions [0.1] — needs: API.1
 - [ ] **API.3** OpenAPI description kept in step with the routes [0.1] — needs: API.2, RES.14
 - [ ] **API.4** Permission decorator used by every route (session or API key) [0.4] — needs: API.1, AUTH.2, AUTH.3
 - [ ] **API.5** Generic CRUD helpers for page-backed resources [0.5] — needs: API.4, ENT.1, GIT.2
 - [ ] **API.6** Request security context: trust HTTPS and client address from Apache (X-Forwarded-Proto) only from a configured trusted proxy; Secure and __Host- cookies; HSTS only when the admin enables it (TLS and certificates are Apache's job) [0.4] — needs: API.1, CFG.4, RND.4
-- [ ] **API.7** Integer API version: counts up with every API change, sent in a response header and kept in one place in the code [0.1] — needs: API.1
+- [x] **API.7** Integer API version: counts up with every API change, sent in a response header and kept in one place in the code [0.1] — needs: API.1
 - [ ] **API.8** Health and status endpoint reports the API version, the database schema version, the software version (MAJOR.MINOR.BUILD) and the configuration state [0.1] — needs: API.1, API.7, DB.5, REL.5
 
 ## DB: Database
