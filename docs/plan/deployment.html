@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deployment - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Deployment</h1>
 
 <h2>Packages (Ubuntu LTS)</h2>
@@ -23,6 +23,7 @@
 <li><code>config.json.example</code>: application configuration (the real <code>config.json</code> is git-ignored).</li>
 </ul>
 <p>Plan for storage: uploaded originals and processed media live in a data directory outside the web root. Set Apache <code>LimitRequestBody</code> to at least 100 MB (the example vhost uses 10 MB; raise it for the upload route only).</p>
+<p>Planned extra setup: SMTP relay credentials in the JSON config; cache and media directories owned by the app user; an <code>https</code> contact URL for the User-Agent string.</p>
 <h2>Documentation site</h2>
 <p>The plan is published with GitHub Pages from the <code>/docs</code> folder of <code>main</code>.</p>
 <h2>Operations</h2>

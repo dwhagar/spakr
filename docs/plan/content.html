@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Content, rendering and security - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Content, rendering and security</h1>
 
 <h2>Allowed content</h2>
@@ -44,8 +44,11 @@
 <li><strong>Processing</strong>: images and video are never served as uploaded. A Redis task runs ImageMagick (images) and ffmpeg (video and audio) as sandboxed subprocesses to re-encode, strip metadata and create thumbnails and poster frames; the processed copy is published only if every check passes. See <a href="../research/media-processing.html">media processing research</a>.</li>
 <li><strong>Size limits</strong>: 10 MB for general files and images, 100 MB for video (admin adjustable).</li>
 <li><strong>Originals</strong>: kept after processing, stored privately outside the web root, never served, and excluded from the public file listing. Admins can purge originals (single file, by age, or all) from the admin screen or a maintenance script. Backups include or exclude them by option.</li>
+<li>Storage: files are kept in hashed directories with simply named resolution variants; see <a href="platform.html">platform services</a>.</li>
 <li>Checks: extension and sniffed MIME must agree, size limit, files renamed to their content hash, stored outside the web root and served by the app with <code>X-Content-Type-Options: nosniff</code> and <code>Content-Disposition</code> set appropriately, optional ClamAV scan in the worker.</li>
 </ul>
+<h2>Copyright</h2>
+<p>The site links to the copyright notice and removal-request process in <code>COPYRIGHT.md</code> (removal requests go to sysop@moltenaether.com). Mods can disable media or pages immediately while a request is reviewed.</p>
 <h2>Other security basics</h2>
 <p>Password hashing with argon2 or bcrypt, CSRF tokens, secure and HttpOnly cookies, parameterised SQL only, rate limiting on login, audit log of admin actions.</p>
 

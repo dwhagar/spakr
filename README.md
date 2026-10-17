@@ -19,7 +19,7 @@ A free form game and story database for characters, technology, places, and all 
 All `*.json` files are git-ignored because they hold configuration. Commit `*.example` files instead.
 
 ## Licence
-Code: MIT ([`LICENSE`](LICENSE)). Game content: CC BY-SA 4.0 ([`CONTENT-LICENSE.md`](CONTENT-LICENSE.md)).
+Code: MIT ([`LICENSE`](LICENSE)). Game content: CC BY-SA 4.0 ([`CONTENT-LICENSE.md`](CONTENT-LICENSE.md)). Copyright notice and removal requests: [`COPYRIGHT.md`](COPYRIGHT.md).
 
 ## Plan
 Start at [`docs/plan/index.html`](docs/plan/index.html). Once GitHub Pages is enabled (Settings, Pages, deploy from branch, folder `/docs`) it is served at `/plan/`.

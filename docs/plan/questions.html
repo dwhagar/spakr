@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Open questions and defaults chosen - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>Open questions and defaults chosen</h1>
 
 <p>Where the brief left a choice open, a default was picked so planning could continue. The six main questions have been answered (below).</p>
 <div class="q"><h2>Defaults chosen</h2>
 <table><tr><th>Topic</th><th>Default</th></tr>
-<tr><td>Framework</td><td>Plain WSGI with a thin router and Jinja2 templates; no large framework</td></tr>
+<tr><td>Framework</td><td>Flask (user decision) for the API and UI; the earlier plain-WSGI default is withdrawn</td></tr>
+<tr><td>UI and API</td><td>Server-rendered UI that calls the API through an in-process client; no separate JavaScript app in 1.0</td></tr>
+<tr><td>ORM and migrations</td><td>SQLAlchemy and Alembic</td></tr>
+<tr><td>Roles</td><td>reader, editor, GM, mod, admin; permission-based and editable by admins</td></tr>
+<tr><td>Key limits</td><td>Non-admin users: up to 10 active API keys, admin adjustable; admins unlimited</td></tr>
+<tr><td>Token lifetimes</td><td>Invitation 7 days, password reset 1 hour</td></tr>
+<tr><td>Media ladder</td><td>Widths 1920, 1280, 640, 320 plus full, thumb, poster, cover; admin adjustable</td></tr>
+<tr><td>Email transport</td><td>SMTP through the local MTA or a configured relay</td></tr>
+<tr><td>User-Agent</td><td><code>spakr/&lt;version&gt; spakr-api/&lt;n&gt; (+&lt;site contact URL&gt;)</code></td></tr>
 <tr><td>Queue library</td><td>RQ on Redis</td></tr>
 <tr><td>Content storage</td><td>Markdown in git is the source of truth; MySQL is a rebuildable index plus accounts</td></tr>
 <tr><td>Math</td><td>Server-side rendering to static markup; no client script</td></tr>
@@ -31,7 +39,16 @@
 <tr><td>GitHub Pages?</td><td>Enable from <code>/docs</code>.</td></tr>
 </table>
 <h2>Still open</h2>
-<p>None at the moment. Resolved late: video limit 100 MB; originals kept privately after transcoding with an admin purge option.</p>
+<h2>New open questions</h2>
+<ol>
+<li>Should the UI call the API in-process (default) or over HTTP from browser JavaScript? The latter allows a richer UI later but needs site JavaScript from day one.</li>
+<li>Is public self-registration wanted, or invitation only? (Default: invitation only.)</li>
+<li>Which SMTP relay or sender address will the site use?</li>
+<li>Should GM-only stay a single flag, or become per-role groups later?</li>
+<li>Is a fixed relation vocabulary (table) better than free-form relation kinds?</li>
+</ol>
+<p>Earlier questions: Resolved late: video limit 100 MB; originals kept privately after transcoding with an admin purge option.</p>
+<p>Also decided: Flask API-first architecture, API keys, Markdown/media storage layout, caching, accounts and SEO as planned in <a href="platform.html">platform services</a>.</p>
 <h2>Licence (resolved)</h2>
 <p>Code is MIT (<code>LICENSE</code>). Game content is CC BY-SA 4.0 (<code>CONTENT-LICENSE.md</code>); the site footer and upload/edit pages should state this in 1.0.</p>
 </main></body></html>

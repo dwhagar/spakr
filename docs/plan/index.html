@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>spakr plan - spakr plan</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="platform.html">Platform</a><a href="../design/database.html">Database design</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
 <h1>spakr plan</h1>
 
 <p>spakr is a free form game database: everything a tabletop or story game needs to run, across three settings (high fantasy, modern / cosmic horror, science fiction). Content is Markdown and LaTeX only, versioned in git, served by Apache with Python.</p>
@@ -12,9 +12,12 @@
 <li><a href="architecture.html">Architecture</a>: stack, process model, queue, repository layout.</li>
 <li><a href="data-model.html">Data model</a>: entity types and how they relate.</li>
 <li><a href="content.html">Content, rendering and security</a>: Markdown, LaTeX, HTML allowlist, git revisions, uploads.</li>
+<li><a href="platform.html">Platform services</a>: Flask API, accounts and roles, API keys, email, media storage, caching, SEO, User-Agent.</li>
+<li><a href="../design/database.html">Database design</a>: MySQL schema with ER overview (draft).</li>
 <li><a href="deployment.html">Deployment</a>: Ubuntu, Apache, MySQL, Redis, example vhost.</li>
 <li><a href="questions.html">Open questions and defaults chosen</a></li>
 </ul>
+<p>Licences and notices: code is MIT, content is CC BY-SA 4.0, and the <a href="https://github.com/dwhagar/spakr/blob/main/COPYRIGHT.md">copyright notice and removal-request process</a> is in <code>COPYRIGHT.md</code>.</p>
 <h2>Principles</h2>
 <ul>
 <li>No HTML authored by users beyond an admin-approved allowlist of simple tags. No CSS or JavaScript inside content, ever.</li>
