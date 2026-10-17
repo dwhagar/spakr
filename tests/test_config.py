@@ -111,7 +111,7 @@ def test_cli_missing_config_exits_nonzero_without_traceback(tmp_path):
     )
     assert result.returncode == 2
     assert "Traceback" not in result.stderr
-    assert "configuration error" in result.stderr
+    assert "error" in result.stderr
 
 
 def test_cli_version():

@@ -10,6 +10,20 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: spakr_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # A throwaway schema: the database tests drop every table in it.
+      SPAKR_TEST_DATABASE_URL: mysql+pymysql://root:root@127.0.0.1:3306/spakr_test?charset=utf8mb4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
