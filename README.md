@@ -12,7 +12,7 @@ A free form game and story database for characters, technology, places, and all 
 | `docs/archive/` | Old docs |
 | `docs/research/` | Research docs |
 | `docs/design/` | Design docs |
-| `docs/plan/` | The plan, as HTML, in tiers with version numbers |
+| `docs/plan/` | The plan, as HTML, as phases matched to version numbers (0.0 to 0.9, then 1.0) with a dependency tree |
 | `TODO.md`, `CHANGELOG.md`, `VERSION` | Work items `[CAT].[NUMBER]`, change history, MAJOR.MINOR |
 | `examples/` | Configuration and service examples (Apache vhost, systemd units) |
 | `scripts/` | Maintenance scripts (`version.sh` prints `MAJOR.MINOR.BUILD`) |

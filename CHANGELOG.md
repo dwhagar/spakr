@@ -5,6 +5,15 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 ## [Unreleased]
 
 ### Changed
+- Plan reworked as a dependency tree: 140 TODO items, each naming the ids it needs, in phases 0.0 to 0.9 matched to version numbers. 0.9 is now the pre-release working version; 0.1 to 0.8 are building blocks; 1.0 is the release (DOC.1).
+- Preview endpoint (RND.6) moved to phase 0.5 because it needs the permission decorator.
+
+### Added
+- Phase 0.0 research items RES.1 to RES.19 for open library and approach choices (math, MultiMarkdown, sanitiser, git access, email, search, SEO, uploads, front end, rate limiting, entity fields, OpenAPI, packaging, hosting, backups, accessibility, import/export).
+- TST category (test harness, API test client, sample content, end-to-end smoke test) and items FND.9, AUTH.11, ENT.13, LNK.7, UI.10.
+- `docs/plan/tree.html` with a phase ladder and item tree.
+
+### Changed
 - Relation types are a fixed, admin-managed vocabulary (`relation_kind` table), not free-form labels; added LNK.6 for its admin API (LNK.3).
 
 ## [0.0.0] - 2026-10-17
