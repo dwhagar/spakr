@@ -6,6 +6,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 
 ### Added
 - Python package skeleton in `src/spakr` with `pyproject.toml` (Python 3.12 or newer, start-up error otherwise), data paths under `/data` (`SPAKR_DATA_DIR` and `SPAKR_CONFIG` overrides), the software version helper and the first tests (FND.1, FND.10).
+- Package skeleton and config loader (FND.1, FND.2, CFG.3): `src/spakr` package for Python 3.12, `pyproject.toml`, frozen settings objects with a `Secret` wrapper, `python -m spakr check-config|version`. A missing or invalid `config.json` ends with a clear message and exit status 2, never a traceback. `paths.data_dir` (default `/data`, git-ignored; `SPAKR_DATA_DIR` overrides it for tests) holds all runtime data.
 - Platform and security research (RES.5, RES.6, RES.9, RES.12, RES.14, RES.15, RES.16, RES.17, RES.18, RES.20 done) as pages under `docs/research`, with experiments run on Ubuntu 24.04: Flask, pydantic and argon2 under apt mod_wsgi, file-type sniffing, an OpenAPI spike and atomic `config.json` rewrites under contention. Plus a platform conventions page (queue, logging, MySQL, outbound HTTP, testing and CI, privacy).
 - New suggested items: AUTH.12 (user data export), MED.9 (optional ClamAV scan), MED.10 (captions and transcripts), DOC.7 (privacy page).
 

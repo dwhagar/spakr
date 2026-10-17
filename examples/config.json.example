@@ -5,6 +5,7 @@
     "_note": "MANUAL ONLY. Not editable from the web interface or API.",
     "host": "127.0.0.1",
     "port": 3306,
+    "socket": "",
     "name": "spakr",
     "user": "spakr",
     "password": "CHANGE-ME (secret)"
@@ -33,12 +34,8 @@
   },
 
   "paths": {
-    "_note": "Relative to the project root. All data lives under /data, which is git-ignored.",
-    "data_dir": "data",
-    "content_repo": "data/content.git",
-    "media": "data/media",
-    "media_originals": "data/media-originals",
-    "cache": "data/cache"
+    "_note": "Everything lives under data_dir (default /data, git-ignored). content_repo, media, media_originals, cache and uploads default to subfolders of it and rarely need changing.",
+    "data_dir": "/data"
   },
 
   "site": {
