@@ -29,6 +29,16 @@
 docs/           archive, research, design, plan (plan is HTML for GitHub Pages)
 examples/       Apache vhost, systemd units, config.json.example
 scripts/        maintenance scripts (backup, migrate, reindex)</pre>
+<h2>Integrity and recovery</h2>
+<p>Built in from the start (owner decision): every stored artifact has a checksum, parity data protects the content store and media, and every artifact is classed as <em>source of truth</em> or <em>rebuildable</em>. Working classification, to be confirmed by RES.27 and recorded in INT.1:</p>
+<table><tr><th>Data</th><th>Class</th><th>Recovery</th></tr>
+<tr><td>Pages (git content store)</td><td>Source of truth</td><td>Parity data, git fsck, backups</td></tr>
+<tr><td>Media originals</td><td>Source of truth</td><td>Hash manifest, parity data, backups</td></tr>
+<tr><td>Accounts, settings, audit, invitations (MySQL only)</td><td>Source of truth</td><td>Checksummed journal (INT.9), row checksums, backups</td></tr>
+<tr><td>Page index, search tables, relations, usage index</td><td>Rebuildable</td><td>Rebuilt from the content store (DB.3)</td></tr>
+<tr><td>Media variants, rendered-page cache</td><td>Rebuildable</td><td>Regenerated from originals and pages (INT.5)</td></tr></table>
+<p>Tools: <code>spakr verify</code> (also scheduled and shown in health and status), <code>spakr repair</code> and the damage-and-recover tests. See the INT category in <a href="tiers.html">the tiers</a>.</p>
+
 <h2>Layers</h2>
 <pre>browser / API client / scripts
         |
