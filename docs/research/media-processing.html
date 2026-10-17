@@ -34,7 +34,7 @@
 <h2>Processing rules per upload class</h2>
 <table><tr><th>Class</th><th>Pipeline</th></tr>
 <tr><td>Images (PNG, JPEG, GIF, WebP)</td><td>Sniff, Pillow decode check and pixel limit, ImageMagick re-encode with metadata stripped (<code>-strip</code>, auto-orient), make thumbnails. The re-encoded copy is what gets served.</td></tr>
-<tr><td>Video (on by default: MP4, WebM, MOV input)</td><td><code>ffprobe</code> check (streams, duration and size limits, no external references), ffmpeg transcode to H.264/AAC MP4 and optionally VP9/Opus WebM, metadata stripped, poster frame extracted (embedded cover image from the metadata if present, otherwise a frame from the video, for example <code>ffmpeg -ss</code> a second in with <code>-frames:v 1</code>). Limit protocols with <code>-protocol_whitelist file</code>. Original discarded or kept in quarantine by setting.</td></tr>
+<tr><td>Video (on by default: MP4, WebM, MOV input)</td><td><code>ffprobe</code> check (streams, duration and size limits, no external references), ffmpeg transcode to H.264/AAC MP4 and optionally VP9/Opus WebM, metadata stripped, poster frame extracted (embedded cover image from the metadata if present, otherwise a frame from the video, for example <code>ffmpeg -ss</code> a second in with <code>-frames:v 1</code>). Limit protocols with <code>-protocol_whitelist file</code>. Original kept in private storage (never served; admin purge available).</td></tr>
 <tr><td>Audio (on by default)</td><td>Same ffprobe/ffmpeg path as video: probe, check duration and size, transcode to AAC in MP4/M4A and optionally Opus in Ogg/WebM, strip tags except title and artist, extract embedded cover art as an image and re-encode it through the image pipeline.</td></tr>
 <tr><td>SVG</td><td>Off by default (can carry script). If enabled, rasterise to PNG rather than serving the SVG.</td></tr>
 <tr><td>PDF and others</td><td>Off by default; admin may enable. Not processed by ImageMagick (Ghostscript policy stays disabled).</td></tr>
@@ -45,6 +45,7 @@
 <ul>
 <li>Parser exploits: unprivileged user, no network (systemd sandboxing or <code>unshare</code>), CPU/memory/time limits, current distribution security updates.</li>
 <li>Decompression bombs and huge frame counts: Pillow <code>MAX_IMAGE_PIXELS</code>, ImageMagick policy limits, ffprobe-based checks before transcoding.</li>
+<li>Originals are untrusted files kept on the server: store them with no execute bit, outside the web root, owned by a user the web app cannot execute from, and expose them to nobody except an admin download for review.</li>
 <li>Long jobs: run in the worker with a hard timeout; the UI shows "processing" until the task completes.</li>
 <li>Failed files stay in quarantine and an admin can review them (the existing override path).</li>
 </ul>
