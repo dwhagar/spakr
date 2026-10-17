@@ -62,6 +62,7 @@
 <tr><td>Media tools (RES.10)</td><td>ImageMagick (one process writes the whole width ladder, WebP output, spakr <code>policy.xml</code> via <code>MAGICK_CONFIGURE_PATH</code>) and ffmpeg with a protocol whitelist; Pillow only to verify. Memory limits by cgroup, not <code>RLIMIT_AS</code>. See <a href="../research/media-tools.html">research</a></td></tr>
 <tr><td>Front end and CSP (RES.11)</td><td>Server-rendered reading pages, native ES modules, no framework or build step to start; strict CSP with no inline script or style from the first commit; themes via CSS variables with a server-set <code>data-theme</code>. See <a href="../research/front-end.html">research</a></td></tr>
 <tr><td>Caching (RES.25)</td><td>Rendered body cached by content key (commit, render version, allowlist version): per-process LRU plus files on disk, atomic writes, no Redis for it; link status resolved after the cache. See <a href="../research/caching.html">research</a></td></tr>
+<tr><td>Content store (RES.29)</td><td>Git stays the source of truth for page content; MySQL is a rebuildable index. Front matter is complete (GIT.9) and each page file has a stored SHA-256. MySQL as the truth writes about 15 times faster but cannot rebuild itself, is 7 times larger in backups and cannot carry parity in place (<a href="../research/content-store-choice.html">RES.29</a>)</td></tr>
 </table></div>
 <h2>Questions (all resolved)</h2>
 <table><tr><th>Question</th><th>Decision</th></tr>
