@@ -224,3 +224,4 @@ __marimo__/
 
 # All runtime data (content repository, media, originals, cache) lives in /data and is never committed
 /data/
+src/spakr/_version.txt

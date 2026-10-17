@@ -36,7 +36,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 
 Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 
-- [ ] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
+- [x] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
 - [ ] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
 - [ ] **FND.3** WSGI entry point (daemon mode, pass-authorization on) and the small CGI shim (health and maintenance only) [0.1] — needs: FND.1, API.1, RES.16
 - [ ] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
@@ -45,7 +45,7 @@ Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 - [ ] **FND.7** Lint, format and test tooling; tests workflow stays on the 07:00 UTC schedule only, and the daily run opens an issue when it fails [0.1] — needs: FND.1
 - [ ] **FND.8** Structured logging [0.1] — needs: FND.1, FND.2
 - [ ] **FND.9** Command-line tool (spakr): init-config, init-db, create-admin, reindex, load-sample, backup, restore, requeue-stuck, version [0.1] — needs: FND.2, DB.1
-- [ ] **FND.10** Python 3.12 required: `requires-python >=3.12` in pyproject and a clear startup error on older versions [0.1] — needs: FND.1
+- [x] **FND.10** Python 3.12 required: `requires-python >=3.12` in pyproject and a clear startup error on older versions [0.1] — needs: FND.1
 - [ ] **FND.11** Data directory `/data` in the project root: all data (content repository, media, originals, cache) lives under it, it is git-ignored, created and checked at startup [0.1] — needs: FND.2, CFG.2
 
 ## API: API (Flask, /api/v1)
