@@ -30,6 +30,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [ ] **DOC.4** Editor guide: writing pages, links, media syntax, visibility [0.9] — needs: UI.4, MED.7, LNK.1
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
+- [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
 
 ## FND: Foundation
 
@@ -37,13 +38,13 @@ Issue: [#10](https://github.com/dwhagar/spakr/issues/10)
 
 - [ ] **FND.1** Python package skeleton in src/ with pyproject and pinned dependencies [0.1] — needs: RES.15
 - [ ] **FND.2** JSON configuration loader: config.json (git-ignored) validated against examples/config.json.example [0.1] — needs: FND.1
-- [ ] **FND.3** WSGI entry point and the small CGI shim [0.1] — needs: FND.1, API.1, RES.16
+- [ ] **FND.3** WSGI entry point (daemon mode, pass-authorization on) and the small CGI shim (health and maintenance only) [0.1] — needs: FND.1, API.1, RES.16
 - [ ] **FND.4** Shared outbound HTTP helper with the required User-Agent (software, version, API version) [0.1] — needs: FND.1
 - [ ] **FND.5** Dev setup script for Ubuntu 24.04 [0.1] — needs: FND.1, RES.15
 - [ ] **FND.6** Apache vhost and systemd unit examples in examples/ [0.1] — needs: FND.3, QUE.2, RES.16
-- [ ] **FND.7** Lint, format and test tooling; tests workflow stays on the 07:00 UTC schedule only [0.1] — needs: FND.1
+- [ ] **FND.7** Lint, format and test tooling; tests workflow stays on the 07:00 UTC schedule only, and the daily run opens an issue when it fails [0.1] — needs: FND.1
 - [ ] **FND.8** Structured logging [0.1] — needs: FND.1, FND.2
-- [ ] **FND.9** Command-line tool (spakr): init-db, create-admin, reindex, load-sample, version [0.1] — needs: FND.2, DB.1
+- [ ] **FND.9** Command-line tool (spakr): init-config, init-db, create-admin, reindex, load-sample, backup, restore, requeue-stuck, version [0.1] — needs: FND.2, DB.1
 
 ## API: API (Flask, /api/v1)
 
@@ -105,12 +106,13 @@ Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 - [ ] **AUTH.3** Roles and permissions: reader, editor, GM, mod, admin [0.4] — needs: AUTH.1, DB.2
 - [ ] **AUTH.4** Invitation flow (7-day tokens) [0.4] — needs: AUTH.1, MAIL.2
 - [ ] **AUTH.5** Password reset flow (1-hour tokens) [0.4] — needs: AUTH.1, MAIL.2
-- [ ] **AUTH.6** API keys: users limited to their own permissions, admins unlimited, per-user cap [0.4] — needs: AUTH.2, AUTH.3
+- [ ] **AUTH.6** API keys: users limited to their own permissions, admins unlimited, per-user cap; keys cannot create keys or change account security [0.4] — needs: AUTH.2, AUTH.3
 - [ ] **AUTH.7** Audit log [0.4] — needs: DB.2
 - [ ] **AUTH.8** Admin settings API: reads and writes every web-editable setting; never returns secret values [0.4] — needs: AUTH.3, API.4, CFG.4, CFG.5
 - [ ] **AUTH.9** HTML allowlist approval API [0.4] — needs: AUTH.8, RND.3
 - [ ] **AUTH.10** Account editing API (profile, email, password, roles) [0.4] — needs: AUTH.2, AUTH.3
 - [ ] **AUTH.11** Bootstrap the first admin account from the command line [0.4] — needs: FND.9, AUTH.1, AUTH.3
+- [ ] **AUTH.12** User data export: profile, contributions and audit entries about the account as JSON [0.4] — needs: AUTH.3, AUTH.10
 
 ## MAIL: Email
 
@@ -185,6 +187,8 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.6** Gated thumbnail series, never enlarged [0.7] — needs: MED.4, MED.5
 - [ ] **MED.7** media: Markdown syntax and HTML5 players [0.7] — needs: RND.1, MED.6, UI.14
 - [ ] **MED.8** Admin purge of originals [0.7] — needs: MED.3, AUTH.3
+- [ ] **MED.9** Optional ClamAV scan of uploads (off by default, admin switch, clamdscan or INSTREAM socket) [0.7] — needs: MED.3, QUE.2
+- [ ] **MED.10** Optional WebVTT captions per video and transcript link per audio file; renderer emits track elements [0.7] — needs: MED.7
 
 ## UI: Web UI (first-party JavaScript client)
 
@@ -213,7 +217,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.2** Rate limiting [0.9] — needs: API.4, RES.12
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, RES.18, UI.13
-- [ ] **OPS.5** Backup script covering git store, MySQL and media [0.9] — needs: DB.4, GIT.1, MED.3, RES.17
+- [ ] **OPS.5** Backup and restore commands (spakr backup, spakr restore) covering git store, MySQL and media [0.9] — needs: DB.4, GIT.1, MED.3, RES.17
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
 
@@ -225,22 +229,22 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.2** Server-side LaTeX math: KaTeX, MathJax, latex2mathml or pandoc; static markup, no client script [0.0]
 - [ ] **RES.3** HTML sanitiser library (nh3, bleach or own) and how the admin allowlist maps onto it [0.0]
 - [ ] **RES.4** Git access from Python: GitPython, dulwich or the git binary via subprocess; locking and speed [0.0]
-- [ ] **RES.5** Password hashing, sessions and CSRF: argon2-cffi and Flask extensions versus own code [0.0]
-- [ ] **RES.6** Email through an external SMTP relay (never a local MTA): library, TLS modes, relay settings as configuration, SPF/DKIM notes [0.0]
+- [x] **RES.5** Password hashing, sessions and CSRF: argon2-cffi and Flask extensions versus own code [0.0]
+- [x] **RES.6** Email through an external SMTP relay (never a local MTA): library, TLS modes, relay settings as configuration, SPF/DKIM notes [0.0]
 - [ ] **RES.7** Search approach: InnoDB FULLTEXT (default parser or ngram) versus an external engine; relevance trials on sample pages [0.0]
 - [ ] **RES.8** SEO libraries and markup: sitemap writer, canonical URLs, meta and structured data [0.0]
-- [ ] **RES.9** Upload type sniffing: python-magic or filetype, and whether to add a virus scan [0.0]
+- [x] **RES.9** Upload type sniffing: python-magic or filetype, and whether to add a virus scan [0.0]
 - [ ] **RES.10** Media toolchain per operation: confirm the efficient choice (ImageMagick or Pillow for images; ffmpeg for all audio and video). ffmpeg and ImageMagick are preferred; Python libraries allowed where measurably better (builds on docs/research/media-processing.html) [0.0]
 - [ ] **RES.11** Front-end approach: plain JavaScript modules or a small library, build and asset-hashing tooling, CSP-compatible [0.0]
-- [ ] **RES.12** Rate limiting: Flask-Limiter or own Redis counters [0.0]
+- [x] **RES.12** Rate limiting: Flask-Limiter or own Redis counters [0.0]
 - [ ] **RES.13** Entity field definitions: choose the structured fields and front matter schema for each entity type [0.0]
-- [ ] **RES.14** OpenAPI generation: apispec/flask-smorest or hand-written description [0.0]
-- [ ] **RES.15** Python packaging and dependencies on Ubuntu 24.04: apt versus venv, pyproject layout [0.0]
-- [ ] **RES.16** Apache hosting: mod_wsgi versus a proxy to gunicorn; which scripts stay CGI [0.0]
-- [ ] **RES.17** Backup approach for MySQL, the git store and media (mysqldump, git bundle, rsync) [0.0]
-- [ ] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
+- [x] **RES.14** OpenAPI generation: apispec/flask-smorest or hand-written description [0.0]
+- [x] **RES.15** Python packaging and dependencies on Ubuntu 24.04: apt versus venv, pyproject layout [0.0]
+- [x] **RES.16** Apache hosting: mod_wsgi versus a proxy to gunicorn; which scripts stay CGI [0.0]
+- [x] **RES.17** Backup approach for MySQL, the git store and media (mysqldump, git bundle, rsync) [0.0]
+- [x] **RES.18** Accessibility checklist (WCAG 2.2 AA) for the UI [0.0]
 - [ ] **RES.19** Import and export formats [0.0]
-- [ ] **RES.20** Settings and secrets implementation details: file locking, mode 0600, atomic rewrite of config.json and reload across workers (approach decided: the app rewrites config.json, secret fields write-only) [0.0]
+- [x] **RES.20** Settings and secrets implementation details: file locking, mode 0600, atomic rewrite of config.json and reload across workers (approach decided: the app rewrites config.json, secret fields write-only) [0.0]
 
 ## TST: Testing and sample content
 

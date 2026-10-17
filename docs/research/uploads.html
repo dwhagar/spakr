@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.9 Upload safety and file type checks - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.9: Upload safety and file type checks</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks MED.1 and MED.2; feeds MED.3 to MED.5 (thread A owns the media toolchain, RES.10). Builds on <a href="media-processing.html">media processing</a>.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Type detection:</strong> <code>python-magic</code> (libmagic) on the first 8 KiB, compared with the extension and an admin-controlled allow-list. Not <code>filetype</code>: it cannot recognise text, CSV or SVG, so it cannot enforce the TXT/MD/CSV and SVG-off policy.</li>
+<li><strong>Sniffing is only the first gate.</strong> Every image is decoded and re-encoded, every audio and video file is probed and transcoded; the re-encoded copy is the only thing served. A file that passes the sniff but fails decoding is rejected.</li>
+<li><strong>Antivirus:</strong> optional, off by default. Provide an admin switch that sends files to a local <code>clamd</code> before processing. The originals are never served, and re-encoding removes embedded payloads from what is served, so the default risk is already low.</li>
+<li>Safe-list and size limits as decided (PNG, JPEG, GIF, WebP, MP4/WebM/MOV, common audio, TXT, MD, CSV; SVG, PDF and archives off; 10 MB general, 100 MB video, admin adjustable).</li>
+</ul>
+
+<h2>Experiment: what the libraries report</h2>
+<p>Generated real files with ffmpeg and ImageMagick on Ubuntu 24.04 (libmagic 5.45) and ran both libraries on the first 8 KiB of each.</p>
+<table><tr><th>File</th><th><code>python-magic</code> 0.4.27</th><th><code>filetype</code> 1.2.0</th></tr>
+<tr><td>PNG, JPEG, GIF, WebP</td><td>image/png, jpeg, gif, webp</td><td>same</td></tr>
+<tr><td>MP4, MOV, WebM</td><td>video/mp4, video/quicktime, video/webm</td><td>same</td></tr>
+<tr><td>MP3, Ogg, FLAC, M4A</td><td>audio/mpeg, audio/ogg, audio/flac, audio/x-m4a</td><td>audio/mpeg, audio/ogg, audio/x-flac, audio/mp4</td></tr>
+<tr><td>TXT and Markdown</td><td>text/plain (Markdown is not distinguishable from text)</td><td><strong>none</strong></td></tr>
+<tr><td>CSV</td><td>text/csv</td><td><strong>none</strong></td></tr>
+<tr><td>SVG with a script element</td><td>image/svg+xml</td><td><strong>none</strong></td></tr>
+<tr><td>PDF</td><td>application/pdf</td><td>application/pdf</td></tr>
+<tr><td>Random bytes, text with a NUL byte</td><td>application/octet-stream</td><td>none</td></tr>
+<tr><td><code>evil.php.png</code> (a real PNG with a double extension)</td><td>image/png</td><td>image/png</td></tr>
+<tr><td>A file starting <code>GIF89a;&lt;?php echo 1;?&gt;</code> (not a real image)</td><td><strong>image/gif</strong></td><td><strong>image/gif</strong></td></tr>
+</table>
+<p>The last row is the important one: both libraries accept a fake image on its magic bytes alone. That is why the pipeline decodes and re-encodes (Pillow check, then ImageMagick) and never serves the uploaded bytes. Markdown has no signature at all, so the rule for TXT, MD and CSV is: extension in the allow-list, content must be valid UTF-8 with no NUL bytes, size limit, and it is served as plain text.</p>
+
+<h2>Library facts</h2>
+<table><tr><th>Package</th><th>Facts</th><th>Source and status</th></tr>
+<tr><td>python-magic 0.4.27</td><td>MIT, released 2022-06-07; Ubuntu 24.04 apt has the same version (<code>python3-magic</code>) and <code>libmagic1t64</code> 5.45. Old release date, but a thin binding to libmagic, which gets security updates from Ubuntu.</td><td>PyPI, Ubuntu archive. <strong>Verified.</strong></td></tr>
+<tr><td>filetype 1.2.0</td><td>MIT, pure Python, released 2022-11-02; no libmagic dependency but no text or SVG detection.</td><td>PyPI. <strong>Verified</strong>; behaviour from the experiment above.</td></tr>
+<tr><td>Pillow 13.0.0</td><td>MIT-CMU, released 2026-10-16; Ubuntu 24.04 apt has 10.2.0 with security patches (10.2.0-1ubuntu1.3). Use it for the decode check and pixel limit.</td><td>PyPI, Ubuntu archive. <strong>Verified.</strong></td></tr>
+<tr><td>ClamAV</td><td>Ubuntu 24.04 security updates carry 1.5.4 (<code>clamav</code>, <code>clamav-daemon</code>); 26.04 has 1.5.4 in updates. The PyPI wrappers are stale (<code>clamd</code> 1.0.2 from 2014; <code>pyclamd</code> 0.4.0 from 2017, LGPL), so use <code>clamdscan</code> as a subprocess or the short INSTREAM socket protocol written in-house (about 30 lines).</td><td>Ubuntu archive, PyPI. <strong>Verified.</strong> The memory use of <code>clamd</code> (it loads the whole signature database; commonly more than 1 GB) is from memory and was not measured.</td></tr>
+</table>
+
+<h2>OWASP File Upload checklist, applied</h2>
+<p>Read directly from the OWASP File Upload Cheat Sheet (2026-10-17).</p>
+<table><tr><th>OWASP control</th><th>How spakr meets it</th></tr>
+<tr><td>Allow-list extensions; do not trust Content-Type</td><td>Admin-controlled allow-list (<code>upload_policy</code>); the request's Content-Type is ignored; libmagic result must match the extension's class.</td></tr>
+<tr><td>Generated file names; length and character limits</td><td>Files are stored under the SHA-256 directory; <code>original_name</code> is display-only, trimmed to 255 characters, never used as a path.</td></tr>
+<tr><td>File size limit</td><td>Per class from <code>upload_policy.max_bytes</code>; enforced three times: Apache <code>LimitRequestBody</code> on the upload route, Flask <code>MAX_CONTENT_LENGTH</code>, and a counter while streaming to disk.</td></tr>
+<tr><td>Only authorised users upload; CSRF protection</td><td><code>media.upload</code> permission on the route; CSRF token or API key like every unsafe request (<a href="auth-sessions.html">RES.5</a>).</td></tr>
+<tr><td>Store outside the web root</td><td>Quarantine and originals live in directories that no Apache alias exposes; only published variants are under the media alias.</td></tr>
+<tr><td>Antivirus or sandbox; CDR for documents</td><td>Optional clamd step. Images and media are re-encoded (the practical CDR for those types); documents are not accepted by default.</td></tr>
+<tr><td>Decode and re-encode images, strip metadata</td><td>Already the pipeline in the media research (<code>-strip</code>, auto-orient).</td></tr>
+<tr><td>ZIP files not recommended</td><td>Off, not offered as a policy option.</td></tr>
+<tr><td>Double extensions, null bytes, case tricks</td><td>The extension used for classification is the last one, lower-cased, matched against the allow-list; names with NUL or path separators are rejected.</td></tr>
+</table>
+
+<h2>Handling rules</h2>
+<ul>
+<li><strong>Upload path:</strong> stream the request body to a temporary file in the quarantine directory while computing SHA-256 and counting bytes; abort at the limit; never read a whole upload into memory. Mode 0600 (the file's permission bits never carry execute), owned by the app user.</li>
+<li><strong>Dedupe:</strong> if the hash already exists as a published media row, discard the temporary file and reuse the row (the design's deduplication).</li>
+<li><strong>States:</strong> <code>quarantine</code> (just received), <code>processing</code> (queued task running), <code>published</code> or <code>rejected</code>. A rejected file stays for review; mods review, admins override or purge.</li>
+<li><strong>Image limits:</strong> set an explicit maximum pixel count (suggested 50 megapixels, admin-adjustable) and let Pillow's decompression-bomb check raise rather than warn. Pillow's own default only warns at its limit and errors at twice that limit (from memory).</li>
+<li><strong>Text files:</strong> UTF-8 decoding must succeed, no NUL bytes, line count and size limits; served as <code>text/plain; charset=utf-8</code>. Markdown uploads are plain downloads, not rendered pages.</li>
+<li><strong>Serving:</strong> every media response carries <code>X-Content-Type-Options: nosniff</code>; non-media downloads add <code>Content-Disposition: attachment</code>. Add <code>Content-Security-Policy: sandbox</code> on the media location so even a misclassified file cannot run script on the site's origin. An optional <code>media_base_url</code> setting lets the owner serve media from a cookieless domain; it is not required for 1.0 because served files are re-encoded.</li>
+<li><strong>Quotas:</strong> per-user upload rate (<a href="rate-limiting.html">RES.12</a>) and an admin-set total storage quota per user, so one account cannot fill the disk.</li>
+<li><strong>Apache and mod_wsgi limits:</strong> the example vhost's global <code>LimitRequestBody 10485760</code> would block 100 MB video. Set the larger limit only inside the upload route's <code>&lt;Location&gt;</code>. Slow uploads of 100 MB also need generous <code>socket-timeout</code> on the daemon process and Apache <code>Timeout</code>/<code>RequestReadTimeout</code> values; test with a throttled upload in FND.6 (not tested here).</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>Memory use of <code>clamd</code> and scan time on 100 MB video.</li>
+<li>The exact timeout and body-limit directive values for 100 MB uploads through mod_wsgi (a task for FND.6/MED.1).</li>
+<li>Pillow's pixel-limit behaviour is quoted from memory.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>MED.1 (python-magic, extension-class match, decode gate, text rules, route-level body limit), MED.2 (quarantine states), MED.3 (0600 files outside aliases), MED.7 and OPS.4 (captions: see <a href="accessibility.html">RES.18</a>). New suggestion: MED.9 optional ClamAV scan. Recorded in TODO.md.</p>
+
+</main></body></html>

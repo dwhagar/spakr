@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.5 Passwords, sessions, CSRF, tokens and API keys - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>RES.5: Passwords, sessions, CSRF, tokens and API keys</h1>
+<p><em>Research thread B, 2026-10-17. Unblocks AUTH.1 to AUTH.7, AUTH.10, API.4. Recommendation first, evidence after.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Passwords:</strong> <code>argon2-cffi</code> with its defaults (Argon2id, 64 MiB, 3 passes, 4 lanes), rehash on login when parameters change. Own code around it (about 60 lines); no auth framework.</li>
+<li><strong>Password policy (NIST SP 800-63B-4 style):</strong> at least 15 characters because we are password-only, accept at least 64 (we allow 128), no composition rules, no forced rotation, reject passwords on a blocklist, allow paste and password managers.</li>
+<li><strong>Sessions:</strong> our own server-side sessions (the <code>session</code> table already in the database design). Not Flask's signed-cookie session, not Flask-Login, not Flask-Session. Opaque 256-bit random token in a <code>__Host-</code> cookie, only its SHA-256 stored.</li>
+<li><strong>CSRF:</strong> change the plan from "double-submit token" to a <strong>synchronizer token tied to the server session</strong>, sent in an <code>X-CSRF-Token</code> header, plus a <code>Sec-Fetch-Site</code> / <code>Origin</code> check as a second layer. API-key requests are exempt.</li>
+<li><strong>Invitation and reset tokens:</strong> random, hashed in the database, single use, delivered in the URL <strong>fragment</strong> and consumed by a POST (never by opening the link), so mail scanners and server logs cannot use or record them.</li>
+<li><strong>API keys:</strong> <code>spk_</code> prefix, 256-bit secret, SHA-256 stored (a slow hash is pointless for a random secret), constant-time compare. Keys can use data endpoints only; creating keys, changing passwords or emails and managing sessions require a browser session.</li>
+<li><strong>Audit log:</strong> append-only table written in the same transaction as the action; secrets and tokens never appear in it.</li>
+</ul>
+
+<h2>Verified facts and what they decide</h2>
+<table><tr><th>Fact</th><th>Source and status</th><th>Decision it supports</th></tr>
+<tr><td>OWASP minimum for Argon2id: 19 MiB memory, 2 iterations, parallelism 1 (equivalent options 46 MiB/1, 12 MiB/3, 9 MiB/4, 7 MiB/5).</td><td>OWASP Password Storage Cheat Sheet, read 2026-10-17 from the project's GitHub source. <strong>Verified.</strong></td><td>Anything at or above 19 MiB/t=2 is compliant.</td></tr>
+<tr><td><code>argon2-cffi</code> 25.1.0 (MIT, released 2025-06-03, Python 3.8 or newer). <code>PasswordHasher()</code> defaults are Argon2id, time 3, memory 65536 KiB, parallelism 4 (the RFC 9106 low-memory profile).</td><td>PyPI metadata and running the package here. <strong>Verified.</strong> One hash took about 105 ms on this sandbox (single sample, not a production number).</td><td>Defaults already exceed the OWASP minimum; no tuning needed for 1.0.</td></tr>
+<tr><td>Ubuntu 24.04 ships <code>python3-argon2</code> 21.1.0; 26.04 ships 25.1.0.</td><td>Ubuntu archive Packages files. <strong>Verified.</strong></td><td>Use a virtualenv with pip (see RES.15), not apt Python packages.</td></tr>
+<tr><td>Session IDs need at least 64 bits of entropy from a CSPRNG (the cheat sheet says prefer 128+ bits); the <code>__Host-</code> cookie prefix is recommended for session IDs; renew the ID after any privilege change; apps should have idle and absolute timeouts (typical idle 15 to 30 minutes for low-risk apps, absolute 4 to 8 hours for office-day apps).</td><td>OWASP Session Management Cheat Sheet. <strong>Verified.</strong></td><td>256-bit token, <code>__Host-</code> cookie, renew on login, password, role and email change, both timeouts.</td></tr>
+<tr><td>Naive double-submit cookies are bypassable by anyone who can write cookies on the domain (for example a vulnerable sibling subdomain); signed double-submit or a server-side synchronizer token is recommended; Fetch Metadata (<code>Sec-Fetch-Site</code>) is a strong layer for modern browsers, and an <code>Origin</code> check is the required fallback; custom-header tokens must not be validated against a cookie.</td><td>OWASP CSRF Prevention Cheat Sheet. <strong>Verified.</strong></td><td>We have server-side sessions, so use the synchronizer token and add the Fetch Metadata layer.</td></tr>
+<tr><td>Password reset: same response for known and unknown accounts, uniform timing, rate limit, do not log the user in automatically after a reset, offer or force invalidation of existing sessions, send a notice, invalidate outstanding reset links after recovery.</td><td>OWASP Forgot Password Cheat Sheet. <strong>Verified.</strong></td><td>Reset flow rules below.</td></tr>
+<tr><td>Login throttling: count failures per account (not only per IP); exponential lockout (one second doubling) is an alternative to a fixed lockout.</td><td>OWASP Authentication Cheat Sheet. <strong>Verified.</strong></td><td>Throttle with growing delays, never hard-lock accounts (see RES.12).</td></tr>
+<tr><td>NIST SP 800-63B-4 (final, 2025): 15-character minimum when a password is the only authenticator (8 if part of multi-factor), allow at least 64 characters, no composition rules, no periodic rotation, blocklist screening.</td><td>Only secondary sources (vendor and standards-commentary pages) were reachable; nist.gov was not. <strong>Not verified against the primary text</strong>; the sources agreed with each other.</td><td>Policy above. Re-check the exact wording before AUTH.1 is merged.</td></tr>
+<tr><td>Flask 3.1.3 (BSD-3, 2026-02-19); Flask-Login 0.6.3; Flask-Session 0.8.0 (2024-03-26); Flask-WTF 1.3.0 (2026-04-23); itsdangerous 2.2.0; pyotp 2.10.0 (MIT).</td><td>PyPI metadata. <strong>Verified.</strong></td><td>Flask-Login and Flask-Session add little over our own table; Flask-WTF's CSRF is built on Flask's signed session.</td></tr>
+</table>
+
+<h2>Why not the framework helpers</h2>
+<table><tr><th>Option</th><th>Verdict</th></tr>
+<tr><td>Flask's built-in signed-cookie <code>session</code></td><td>Cannot be revoked server-side, cannot list "active sessions", and the plan requires both (sign out other sessions, suspend a user at once). Rejected.</td></tr>
+<tr><td>Flask-Login</td><td>Only manages "who is the current user" on top of a session; we already need our own session table and permission lookups. Rejected as an unnecessary dependency.</td></tr>
+<tr><td>Flask-Session</td><td>Stores server-side sessions in Redis or SQL, but with its own schema and no per-session user list, IP or hashed token; we need the table from the database design anyway. Rejected.</td></tr>
+<tr><td>Flask-WTF CSRFProtect</td><td>Ties the token to Flask's signed session and WTForms conventions. Our UI is a JavaScript client calling a JSON API, so own code is shorter and testable. Rejected.</td></tr>
+<tr><td>Own code on stdlib (<code>secrets</code>, <code>hashlib</code>, <code>hmac</code>) plus argon2-cffi</td><td><strong>Chosen.</strong> About 300 lines total for sessions, CSRF, tokens and key checks, all covered by tests (TST.2).</td></tr>
+</table>
+
+<h2>Passwords</h2>
+<ul>
+<li>Hash with <code>PasswordHasher()</code>; store the encoded string (it carries its own parameters) in <code>user.password_hash</code>. On every successful login call <code>check_needs_rehash</code> and rewrite the hash if parameters changed.</li>
+<li>Normalise the submitted password with Unicode NFKC before hashing; do not trim or truncate. Accept up to 128 characters.</li>
+<li>Memory cost: each in-flight hash needs 64 MiB. The example vhost runs 2 processes with 8 threads, so 16 simultaneous logins could use about 1 GiB. Guard with a per-process semaphore (for example 4 concurrent hashes) and the login rate limits; an admin setting may lower the memory cost to the OWASP minimum on small hosts.</li>
+<li>Unknown user: still run one hash against a fixed dummy hash so response time does not reveal which accounts exist.</li>
+<li>Pepper: not in 1.0. It adds key management and makes rotation hard; revisit after launch.</li>
+<li><strong>Blocklist:</strong> ship a list of common passwords (the licence of the list must be checked when it is chosen; not yet done) and reject matches and passwords containing the username or email local part. An admin switch for the Pwned Passwords range API (k-anonymity: only the first five characters of the SHA-1 are sent) is optional and off by default for privacy; if enabled it goes through the shared outbound helper (FND.4). I am describing that API from memory and did not call it.</li>
+<li>Multi-factor: not in 1.0. NIST's lower 8-character minimum applies only with MFA, so adding TOTP later would be a policy relaxation, not a requirement. Candidate library <code>pyotp</code> 2.10.0 (MIT).</li>
+</ul>
+
+<h2>Sessions</h2>
+<table><tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+<tr><td>Token</td><td><code>secrets.token_urlsafe(32)</code> (256 bits)</td><td>Far above the 64-bit OWASP floor.</td></tr>
+<tr><td>Storage</td><td><code>session.id</code> = SHA-256 of the token; the token exists only in the cookie</td><td>A database read does not give working cookies.</td></tr>
+<tr><td>Cookie</td><td><code>__Host-spakr_session</code>; <code>Secure; HttpOnly; SameSite=Lax; Path=/</code>, no <code>Domain</code></td><td><code>__Host-</code> blocks subdomain overwrites and downgrade. <strong>Lax, not Strict:</strong> OWASP's example uses Strict, but Strict hides the session on the first page load after a click from another site (a link from chat looks "logged out"). Our GET routes are read-only and unsafe methods are CSRF-protected, so Lax is safe here.</td></tr>
+<tr><td>Idle and absolute timeout</td><td>Defaults: idle 8 hours, absolute 14 days. Roles holding <code>user.manage</code> or <code>site.configure</code>: idle 1 hour, absolute 12 hours. All admin-adjustable.</td><td>OWASP's quoted ranges are for generic apps (15 to 30 minutes idle); editors write long pages, so the default idle is longer. This is my judgement beyond the cheat sheet and is listed as a default on the questions page.</td></tr>
+<tr><td>Renewal</td><td>New session ID at login, password change, role change and email change; old ID destroyed</td><td>OWASP requirement.</td></tr>
+<tr><td>Writes</td><td><code>last_seen_at</code> updated at most once a minute</td><td>No database write per request.</td></tr>
+<tr><td>Revocation</td><td>Sign out, sign out all, password reset (all sessions end), suspension, deletion</td><td>Meets the "active sessions" screen in the plan.</td></tr>
+<tr><td>Cleanup</td><td>Queue job deletes expired rows daily</td><td></td></tr>
+<tr><td>Timeout warning</td><td>The UI warns before expiry and keeps an unsent editor draft in browser storage</td><td>WCAG 2.2.1 (see RES.18); nobody loses an edit to a timeout.</td></tr>
+</table>
+
+<h2>CSRF</h2>
+<ol>
+<li>The session row holds a random <code>csrf_token</code>. Login and <code>GET /api/v1/auth/session</code> return it in the JSON body. The JavaScript client keeps it in memory (not local storage, not a cookie) and sends it as <code>X-CSRF-Token</code> on every POST, PUT, PATCH and DELETE.</li>
+<li>Reject an unsafe request when the token is missing or wrong (compare with <code>hmac.compare_digest</code>).</li>
+<li>Second layer: if <code>Sec-Fetch-Site</code> is present it must be <code>same-origin</code> (or <code>none</code> for user-typed navigations that are safe methods anyway). If it is absent (old browsers), require <code>Origin</code> (or failing that <code>Referer</code>) to match the site's host from <code>site.base_url</code>.</li>
+<li>JSON endpoints accept only <code>Content-Type: application/json</code> (uploads accept multipart on their own route). This closes plain HTML form posts as a vector.</li>
+<li>No state-changing GET anywhere. The login endpoint is covered by the same origin checks and by rate limits.</li>
+<li>Requests authenticated by <code>Authorization: Bearer</code> use no cookie, so they are exempt; a request carrying both is treated as a cookie request.</li>
+</ol>
+<p><strong>Plan change:</strong> platform.html says "double-submit token issued at login". Because we keep server-side sessions the synchronizer token is simpler and avoids the cookie-injection weakness OWASP describes; platform.html is updated.</p>
+
+<h2>Login, invitation and reset flows</h2>
+<ul>
+<li><strong>Login:</strong> one generic error for unknown user, wrong password and suspended account; per-IP and per-account throttling (RES.12); audit entry for success and failure (username and IP, never the password).</li>
+<li><strong>Tokens:</strong> <code>secrets.token_urlsafe(32)</code>, store only the SHA-256, single use, expiry 7 days (invitation) and 1 hour (reset) as decided, a new token supersedes older ones for the same purpose.</li>
+<li><strong>Link format:</strong> <code>https://site/accept#t=&lt;token&gt;</code>. A URL fragment is never sent to the server, so it stays out of access logs and the <code>Referer</code> header. The page's script reads it, removes it with <code>history.replaceState</code>, and POSTs it. Two problems this avoids: mail scanners that open links (so a GET must never consume a token) and token leakage through server logs. Editing already requires JavaScript, so no non-JS fallback is planned. Pages that handle tokens also send <code>Referrer-Policy: no-referrer</code>.</li>
+<li><strong>Reset request:</strong> always answer "if that address has an account, mail is on its way"; enqueue the work and return immediately so timing is uniform; rate limit per address and per IP.</li>
+<li><strong>After a reset:</strong> do not log the user in; end all their sessions; send a notice to the address; invalidate other outstanding reset tokens.</li>
+<li><strong>Email and password changes</strong> require the current password, send a notice to the old address, and renew the session.</li>
+<li><strong>Email addresses:</strong> syntax check with <code>email-validator</code> 2.3.0 (Unlicense) with deliverability (DNS) checks off on the request path; lower-case before storing.</li>
+</ul>
+
+<h2>API keys</h2>
+<table><tr><th>Item</th><th>Design</th></tr>
+<tr><td>Format</td><td><code>spk_&lt;8-char id&gt;_&lt;43-char secret&gt;</code>. The fixed <code>spk_</code> prefix makes leaked keys findable by secret scanners. The 8-character id fills <code>api_key.prefix</code>; the secret is <code>token_urlsafe(32)</code>.</td></tr>
+<tr><td>Storage</td><td>Only <code>SHA-256(full key)</code> in <code>key_hash</code>; shown once at creation. A fast hash is correct here because the secret already has 256 bits of entropy.</td></tr>
+<tr><td>Check</td><td>Look up by prefix, compare hashes with <code>hmac.compare_digest</code>, then check revoked, expiry, owner status (not suspended), optional IP allow-list.</td></tr>
+<tr><td>Effective permissions</td><td>Key permissions &cap; owner's <em>current</em> permissions (as in the plan); non-admin creation rejects permissions the owner lacks; cap of 10 active keys per non-admin (admin-adjustable).</td></tr>
+<tr><td>What a key cannot do</td><td>Create, list or revoke keys; change password, email or roles; manage sessions; accept invitations. Those need a browser session, so a stolen key cannot mint more keys or lock the owner out. (New constraint for AUTH.6.)</td></tr>
+<tr><td>Header</td><td>Apache must pass it through: see the <code>WSGIPassAuthorization On</code> finding in <a href="apache-hosting.html">RES.16</a> (without it the app never sees the header).</td></tr>
+<tr><td>Housekeeping</td><td><code>last_used_at</code> updated at most once a minute; per-key rate limit (RES.12); expiry optional, with an admin setting for a maximum lifetime (default none).</td></tr>
+</table>
+
+<h2>Audit log</h2>
+<ul>
+<li>Table <code>audit_log</code> as in the database design. Written in the same transaction as the change so an action and its record commit or fail together.</li>
+<li>Events: login success and failure, logout, session revocation, password change and reset, email change, invitation created and accepted, role and permission changes, user suspend or delete, API key create and revoke, settings changes (names of changed keys only, never secret values), allowlist approvals, upload review and purge, page delete and revert by mods.</li>
+<li>Fields: actor, action code, target type and id, JSON detail (no secrets), IP, request id, time. Page edits are not duplicated here; git history is their record.</li>
+<li>Append-only by convention and by privilege: the application's MySQL account gets INSERT and SELECT on <code>audit_log</code> only; retention purges run through the CLI. Whether to enforce that grant is an operations choice for OPS.1; a hash chain for tamper evidence is possible later and not planned for 1.0.</li>
+<li>Retention of IPs: see the privacy section of <a href="platform-conventions.html">platform conventions</a>.</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>The primary text of NIST SP 800-63B-4 (nist.gov not reachable from the research environment).</li>
+<li>Mapping to specific OWASP ASVS 5.0 requirement numbers (ASVS 5.0.0 was released in May 2025 per secondary sources; I did not read the standard itself). The cheat sheets above were read directly.</li>
+<li>The Pwned Passwords API details and the licence of any password blocklist.</li>
+<li>Behaviour under load (concurrent Argon2 memory use is calculated, not measured).</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>AUTH.1 (argon2-cffi, policy, blocklist), AUTH.2 (synchronizer token, Fetch Metadata check, <code>__Host-</code> cookie), AUTH.4 and AUTH.5 (fragment tokens, consume by POST), AUTH.6 (keys cannot manage keys or sessions), AUTH.7 (transactional audit writes). No new items; wording is updated in TODO.md.</p>
+
+</main></body></html>

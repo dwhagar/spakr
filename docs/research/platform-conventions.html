@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform conventions: queue, logging, MySQL, outbound HTTP, testing and CI, privacy - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="auth-sessions.html">Auth</a><a href="email.html">Email</a><a href="uploads.html">Uploads</a><a href="rate-limiting.html">Rate limits</a><a href="openapi.html">OpenAPI</a><a href="packaging.html">Packaging</a><a href="apache-hosting.html">Apache</a><a href="backups.html">Backups</a><a href="accessibility.html">Accessibility</a><a href="settings-config.html">Settings</a><a href="platform-conventions.html">Conventions</a></nav><main>
+<h1>Platform conventions: queue, logging, MySQL, outbound HTTP, testing and CI, privacy</h1>
+<p><em>Research thread B, 2026-10-17. Cross-cutting findings that do not have their own RES item. Each section names the TODO items it affects. Related pages: <a href="auth-sessions.html">auth</a>, <a href="settings-config.html">settings</a>, <a href="apache-hosting.html">hosting</a>, <a href="packaging.html">packaging</a>.</em></p>
+
+<h2>1. Task queue (QUE.1 to QUE.4)</h2>
+<p><strong>Rule: the database is the ledger, Redis is the doorbell.</strong> Every background job has a database row recording the desired outcome (<code>media.state</code>, <code>email_outbox.state</code>, a reindex job row). Redis only carries the wake-up. If Redis loses its data, <code>spakr requeue-stuck</code> re-enqueues rows still marked queued or processing, so no backup of Redis is needed.</p>
+<ul>
+<li><strong>Library:</strong> RQ 2.12.0 (BSD-2) with redis-py (current 8.1.0; the apt versions are old, see <a href="packaging.html">RES.15</a>). RQ runs each job in a forked process, which suits ffmpeg and ImageMagick children and isolates crashes.</li>
+<li><strong>Queues:</strong> <code>default</code> (cache warm, index jobs), <code>mail</code> (single worker, serial sending), <code>media</code> (long jobs, concurrency set by the admin). One systemd template unit <code>spakr-worker@&lt;queue&gt;.service</code> per queue, running as <code>spakr</code> with sandbox options (<code>NoNewPrivileges</code>, <code>ProtectSystem=strict</code> with <code>ReadWritePaths</code> for the data directories, <code>PrivateTmp</code>); the media worker additionally gets no network (<code>PrivateNetwork=yes</code> is possible because ffmpeg and ImageMagick need none).</li>
+<li><strong>Timeouts and retries:</strong> per-kind <code>job_timeout</code> (mail 60 s, image 120 s, video set from duration limits); retry only for transient errors (<a href="email.html">email page</a>); short <code>result_ttl</code> and a longer <code>failure_ttl</code> so the admin can inspect failures (QUE.3's status API reads RQ registries plus the database row).</li>
+<li><strong>Redis security:</strong> Ubuntu's package binds to loopback; keep it that way, set <code>requirepass</code> (the <code>redis_password</code> secret already in the config example), keep protected mode on. Databases: <code>db</code> for RQ, <code>db+1</code> for rate limits and caches (<a href="rate-limiting.html">RES.12</a>).</li>
+<li><strong>Licence note (from memory):</strong> Redis 8 added AGPLv3 as a licence option; Ubuntu 24.04 ships 7.0.15 (the older BSD licence) and 26.04 ships 8.0.5. spakr only talks to Redis over a socket, so this does not affect spakr's own licence.</li>
+</ul>
+
+<h2>2. Logging (FND.8)</h2>
+<ul>
+<li>Standard library <code>logging</code> with a small JSON formatter (or <code>python-json-logger</code> 4.2.0, BSD-2) instead of a logging framework; <code>structlog</code> 26.1.0 (MIT or Apache-2.0) is an option if structured context becomes heavy, but is not needed for 1.0.</li>
+<li>Web app logs go to stderr, which mod_wsgi writes into the Apache error log; workers log to journald. One request id (generated if absent, returned as <code>X-Request-ID</code> and in error bodies) ties access, app, audit and error output together.</li>
+<li><strong>Never log</strong> passwords, tokens, API keys, session cookies, the <code>Authorization</code> header, request bodies of auth and settings routes, or secret settings (<a href="settings-config.html">Secret type</a>). A test feeds known secrets through the stack and greps captured logs.</li>
+<li>Access logs: tokens are never in URLs (fragment links, <a href="auth-sessions.html">RES.5</a>), so Apache's default access log does not capture them; query strings are not logged for the settings and auth routes in any case.</li>
+<li>Rotation: Ubuntu's logrotate configuration for Apache covers the Apache logs; the app adds nothing of its own.</li>
+</ul>
+
+<h2>3. MySQL access layer and migrations (DB.1, DB.2)</h2>
+<ul>
+<li><strong>Target:</strong> Oracle MySQL 8.0 (Ubuntu 24.04, security builds up to 8.0.46 in the archive listing) and 8.4 (Ubuntu 26.04). MariaDB is not a target: collations, JSON and full-text behaviour differ and the plan uses MySQL's ngram parser option.</li>
+<li><strong>Driver and ORM:</strong> <code>mysql+pymysql://</code>, SQLAlchemy 2.0.x, Alembic 1.20.0 (<a href="packaging.html">RES.15</a>). Connect with <code>charset=utf8mb4</code>; create the schema with <code>utf8mb4</code> and an accent-insensitive collation such as <code>utf8mb4_0900_ai_ci</code> (MySQL 8 default) after the full-text search research (RES.7) confirms it; InnoDB only.</li>
+<li><strong>Pool:</strong> <code>pool_pre_ping=True</code>; <code>pool_recycle</code> below the server's <code>wait_timeout</code>; <code>pool_size</code> about 8 per process (2 processes by 8 threads in the example vhost) so the worst case stays under MySQL's default 151 connections together with the workers.</li>
+<li><strong>Unix socket option:</strong> allow <code>database.socket</code> in <code>config.json</code> as an alternative to host and port (faster, no TCP exposure).</li>
+<li><strong>MySQL DDL is not transactional:</strong> each <code>CREATE</code>/<code>ALTER</code> commits implicitly, so a failed migration can leave a half-applied change that Alembic cannot roll back. Rules: one logical change per migration, guard re-runnable steps, take a backup before <code>spakr db upgrade</code> (it is in the upgrade procedure), and test every migration from the previous schema in CI, not only from empty. <code>alembic check</code> (compare models with migrations) runs in the daily job (command recalled from Alembic; confirm at DB.2).</li>
+<li><strong>Privileges:</strong> the application account gets privileges on its own schema only; no <code>FILE</code>, <code>SUPER</code> or global rights. Optional hardening: INSERT/SELECT only on <code>audit_log</code> (retention purge via the CLI with the migration account).</li>
+<li><strong>Write ordering with git:</strong> commit to git first, then update the index rows in one transaction; if the second step fails, the index is stale but the content is safe and <code>spakr reindex</code> repairs it. This is the order the "git is the source of truth" decision implies.</li>
+<li><strong>Time:</strong> store all timestamps in UTC; the UI formats them.</li>
+</ul>
+
+<h2>4. Outbound HTTP and the User-Agent helper (FND.4, REL.5)</h2>
+<ul>
+<li>One module sends every outbound request. The plan's header format is valid under RFC 9110's grammar (product tokens, then a comment): <code>spakr/1.2.3 spakr-api/1 (+https://site/contact)</code>. The contact URL must not contain parentheses or unescaped characters; the helper percent-encodes it.</li>
+<li><strong>Today's callers:</strong> none required by the plan; likely only the optional Pwned Passwords check and future link checks or webhooks. Use the standard library <code>urllib.request</code> unless a real need for sessions or HTTP/2 appears (requests 2.34.2, Apache-2.0, and httpx 0.28.1, BSD-3, were considered and not needed).</li>
+<li><strong>Safe fetch rules</strong> (so admin-supplied URLs cannot reach internal services): <code>https</code> only unless an admin allows plain HTTP for a named host; resolve the host and refuse loopback, private, link-local and cloud-metadata addresses (for example <code>169.254.169.254</code>) and re-check after each redirect; at most 3 redirects; connect timeout 5 s, read timeout 15 s; response size cap; no cookies; never forward credentials across hosts.</li>
+<li><strong>Version string:</strong> read from the generated <code>_version.py</code> (<a href="packaging.html">RES.15</a>) and the API version constant; a test asserts the format with a regular expression.</li>
+</ul>
+
+<h2>5. Testing and CI under the daily-only schedule (FND.7, TST.1, TST.2)</h2>
+<p>Standing preference: code tests run only daily at 07:00 UTC and by manual dispatch, never on push or pull request unless asked. The strategy keeps that and shortens the feedback loop another way.</p>
+<table><tr><th>Layer</th><th>What</th><th>Tools (PyPI facts, 2026-10-17)</th></tr>
+<tr><td>Local fast check</td><td><code>scripts/check</code> runs exactly what CI runs for lint, format check and the fast tests (no services). Every thread and developer runs it before merging, so "merge without waiting" does not mean "merge untested". Optional <code>pre-commit</code> 4.7.0 hook for the same.</td><td>ruff 0.17.1 (MIT), pytest 9.1.1 (MIT), mypy 2.4.0 (MIT) optional, pytest-cov 7.1.0</td></tr>
+<tr><td>Unit</td><td>Pure logic: slugs, permission checks, token handling, config registry, renderer pieces. Time-dependent tests (expiry) use a fake clock.</td><td>freezegun 1.5.5 (Apache-2.0); hypothesis 6.170.1 (MPL-2.0, dev only) for slug and sanitiser properties</td></tr>
+<tr><td>Integration</td><td>Real MySQL, Redis and a temporary git repository: a throwaway schema per test run, rollback per test where possible; fakeredis 2.40.0 only for tests that do not exercise RQ. Migrations: from empty and from the previous schema; model check.</td><td>GitHub Actions service containers for MySQL 8.0 and Redis 7.0 (the 24.04 versions); pytest fixtures (TST.1)</td></tr>
+<tr><td>API contract</td><td>Spec validates, every route is in the spec, fuzzing against the running app.</td><td>openapi-spec-validator 0.9.0, schemathesis 4.31.1 (<a href="openapi.html">RES.14</a>)</td></tr>
+<tr><td>Security regression</td><td>CSRF cases, permission matrix per route, visibility leak tests (VIS.3), rate limits, secret-in-log and secret-in-response tests, header checks (CSP and friends).</td><td>pytest; bandit 1.9.4 (Apache-2.0) static scan; pip-audit 2.10.1 (Apache-2.0) on the lock file</td></tr>
+<tr><td>Accessibility</td><td>axe-core on key pages, both themes, two widths; palette contrast script (<a href="accessibility.html">RES.18</a>).</td><td>axe-core with Playwright</td></tr>
+<tr><td>End to end and operations</td><td>TST.4 smoke test, backup and restore round trip (<a href="backups.html">RES.17</a>), clean install on 24.04 in a container (OPS.7).</td><td>shell and pytest</td></tr>
+</table>
+<ul>
+<li><strong>Schedule stays as is</strong> (<code>schedule</code> 07:00 UTC plus <code>workflow_dispatch</code>). Heavy jobs (fuzzing, accessibility, backup round trip, <code>pip-audit</code>) run in the same daily workflow as separate jobs so one failure does not hide another.</li>
+<li><strong>Do not let failures go unseen:</strong> the daily run opens or updates one GitHub issue (<code>ci-failure</code> label) when it fails and closes it when it passes. Needs <code>issues: write</code> permission in the workflow. Recommended; included in FND.7 as a sub-item for the TODO thread to accept.</li>
+<li><strong>Manual dispatch after risky merges:</strong> a thread can start the workflow with the GitHub MCP <code>actions_run_trigger</code> tool after merging a risky change (migration, auth, rendering) instead of waiting until 07:00.</li>
+<li>Current workflow: it installs only <code>pytest</code> and skips when there are no tests; FND.7 replaces that step with the locked dev install from <a href="packaging.html">RES.15</a>.</li>
+<li><strong>Python and OS matrix:</strong> Python 3.12 on <code>ubuntu-24.04</code> only for now. A 26.04 job is best effort and added when a runner image exists (not verified).</li>
+<li>JSON fixtures: <code>.gitignore</code> ignores <code>*.json</code>; add <code>!tests/**/*.json</code> with the first fixture.</li>
+</ul>
+
+<h2>6. Privacy (informs AUTH, GIT, OPS, DOC items)</h2>
+<p>This is engineering guidance, not legal advice; applicable law depends on the owner's and the users' countries.</p>
+<table><tr><th>Data</th><th>Where</th><th>Rule</th></tr>
+<tr><td>Email address, username, display name</td><td><code>user</code> table</td><td>Email is used for invitations, resets and security notices only; never shown to other users; shown to admins and mods only where needed (user admin screens).</td></tr>
+<tr><td>Password hash</td><td><code>user</code></td><td>Argon2id (<a href="auth-sessions.html">RES.5</a>).</td></tr>
+<tr><td>IP address and user agent</td><td><code>session</code> rows (for the active sessions screen), <code>audit_log.ip</code>, web server logs</td><td>Keep the minimum: sessions drop theirs when the session is deleted; audit IPs are cleared after a configurable period (default 90 days, an admin setting) while the audit entry stays; Apache logs follow Ubuntu's log rotation.</td></tr>
+<tr><td><strong>Authorship in the git history</strong></td><td>Commit author fields of the content repository</td><td><strong>Important, affects GIT.1:</strong> git history cannot be edited afterwards without rewriting every later commit. Do not put real email addresses or real names in commits. Use a pseudonymous identity per account, for example <code>username &lt;u&lt;user-id&gt;@users.noreply.&lt;site domain&gt;&gt;</code>, with the mapping to the account only in the database. Then the repository can be exported or published (OPS.6, backups, mirrors) without leaking personal data, and deleting an account only means deleting the mapping.</td></tr>
+<tr><td>Cookies</td><td>Session cookie only</td><td>Theme preference is stored server-side (UI.12), CSRF token is in memory, so only strictly necessary cookies exist; no tracking, no third-party requests (CSP forbids them), fonts and scripts self-hosted. A consent banner is therefore not expected to be required (general guidance, check locally). The privacy page states this.</td></tr>
+<tr><td>Third parties</td><td>The SMTP relay provider receives recipient addresses and message content</td><td>Listed on the privacy page; chosen by the owner.</td></tr>
+<tr><td>Backups</td><td>Snapshots</td><td>Retention is the effective retention for deleted data (<a href="backups.html">RES.17</a>); stated on the privacy page.</td></tr>
+</table>
+<ul>
+<li><strong>Account deletion:</strong> soft delete (as in the design) plus anonymisation: replace username, display name and email with placeholders (<code>deleted-user-&lt;id&gt;</code>), remove sessions, keys and tokens, keep pages and revisions attributed to the placeholder. A permanent erase of the row is possible when nothing references it.</li>
+<li><strong>User data export:</strong> an account page action that returns the user's profile, their contributions list and audit entries about them as JSON. Small, valuable, and cheap once the API exists; suggested as a new item (AUTH.12).</li>
+<li><strong>Privacy page and notice:</strong> a standard page (admin-editable Markdown, seeded text listing the table above) linked from the footer next to the licence statement (UI.9). Suggested as a new item (DOC.7).</li>
+<li><strong>Public content:</strong> pages are public by default and licensed CC BY-SA, so authors must understand that edits are attributed under their username; the edit screen says so (UI.9).</li>
+</ul>
+
+<h2>What I could not verify</h2>
+<ul>
+<li>MySQL behaviour (no server in the research environment): collation names, connection limits, <code>alembic check</code> command name.</li>
+<li>Availability of a 26.04 CI runner and of GitHub service containers' exact tags.</li>
+<li>Legal requirements for cookies, retention and erasure in any particular jurisdiction.</li>
+</ul>
+
+<h2>Effects on TODO items</h2>
+<p>QUE.1/QUE.2 (named queues, ledger rule, unit hardening), QUE.3 (RQ registries plus database rows), FND.4 (safe fetch rules), FND.7 (CI shape and failure issue), FND.8 (JSON logs, request id, no-secret tests), DB.1/DB.2 (pool, privileges, migration rules, socket option), TST.1 (service containers), GIT.1 (pseudonymous commit identities), OPS.6 (export is safe because of the above). New suggested items: AUTH.12 (user data export), DOC.7 (privacy page), MED.9 (optional ClamAV scan, <a href="uploads.html">RES.9</a>), MED.10 (captions and transcripts, <a href="accessibility.html">RES.18</a>).</p>
+
+</main></body></html>
