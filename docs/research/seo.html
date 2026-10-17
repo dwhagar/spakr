@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.8 SEO libraries and markup - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.8: SEO libraries and markup</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks SEARCH.9; feeds UI.2, UI.9, GIT.6 and RND.4. The search engines' own documentation sites were not reachable from this session, so rules that come from them are stated from general knowledge and marked.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>No SEO library.</strong> Everything needed is a template and about 60 lines of standard-library Python. The sitemap writer produced a 50,000-URL, 4.3 MB sitemap in 25 ms and the result parsed as well-formed XML. Libraries examined add dependencies for what a Jinja template does: <code>feedgen</code> 1.0.0 (LGPL-3.0-or-later, last release 2023-12) for Atom feeds is the only one worth a note, and the recent-changes feed (LNK.7) is also a small template.</li>
+<li><strong>Server-rendered public pages</strong> (already planned as UI.2) are the SEO foundation: complete HTML, no script needed to read, the rendered body from the cache. All markup below goes in the page <code>&lt;head&gt;</code> and costs no JavaScript.</li>
+<li><strong>Canonical URL from configuration, not from the request.</strong> Build <code>&lt;link rel="canonical"&gt;</code>, sitemap and Open Graph URLs from a configured <code>site.base_url</code> (HTTPS, as decided: Apache handles TLS). Using the <code>Host</code> header would let anyone poison a cached page with a foreign host name.</li>
+<li><strong>Per-page head</strong> (all from page data, all escaped by Jinja autoescape): <code>&lt;title&gt;Page title - Site&lt;/title&gt;</code>, <code>&lt;meta name="description"&gt;</code> from the page summary (cut at about 160 characters at a word boundary), canonical link, <code>&lt;meta name="robots"&gt;</code> where needed, Open Graph (<code>og:title</code>, <code>og:description</code>, <code>og:type=article</code>, <code>og:url</code>, <code>og:site_name</code>, <code>og:image</code> using the 1280-wide variant of the page's cover image when it has one) and Twitter card tags (<code>summary_large_image</code> when there is an image, else <code>summary</code>).</li>
+<li><strong>Structured data as JSON-LD</strong>, one block per page: <code>Article</code> (headline, dateModified, inLanguage, isPartOf the site's <code>WebSite</code>, <code>license</code> = the CC BY-SA 4.0 URL) and a <code>BreadcrumbList</code> for type, setting and page. Do not mark up reviews, ratings or people. <strong>Do not add a <code>SearchAction</code> (sitelinks search box)</strong>: Google announced it would stop showing that feature in late 2024 (from memory, could not be re-checked now), so it earns nothing.</li>
+<li><strong>Sitemaps:</strong> <code>/sitemap.xml</code> is a sitemap index pointing to files of at most 45,000 URLs (the protocol allows 50,000 URLs and 50 MB uncompressed each, from the sitemaps.org protocol as I know it; its site was not reachable to re-check). Include only public pages, with <code>lastmod</code> = the date of the last revision. A queue job writes the files into the cache directory after content changes (debounced to once a minute) and Apache serves them as static files; <code>lastmod</code> is cheap because <code>page.updated_at</code> exists.</li>
+<li><strong><code>robots.txt</code></strong> generated from configuration: allow everything public, <code>Disallow: /api/</code>, <code>/admin</code>, <code>/account</code>, <code>/search</code>, history and diff paths, plus <code>Sitemap:</code> with the absolute URL. (Blocking in robots.txt stops crawling, not indexing; see the next point.)</li>
+<li><strong><code>noindex</code> by header.</strong> Send <code>X-Robots-Tag: noindex, nofollow</code> from Flask on edit, history, diff, login, account, search-result and error pages, and on every response to a logged-in user. Search engines must be able to fetch a page to see its <code>noindex</code>, so such paths are not also blocked in robots.txt (history and diff are blocked for crawl budget only; accept that).</li>
+<li><strong>GM-only pages never leak through SEO.</strong> They are absent from the sitemap, from Open Graph, from the JSON-LD of other pages (a link to them is not rendered for anonymous readers), and an anonymous request answers 404, not 403, so their existence is not revealed (VIS.2, VIS.3).</li>
+<li><strong>Renamed pages redirect.</strong> When GIT.6 renames a slug, the old slug stays as an alias and answers <code>301</code> to the new canonical URL. Without this, every rename loses the page's search ranking and breaks inbound links.</li>
+<li><strong>Licence markup:</strong> the footer link to CC BY-SA 4.0 gets <code>rel="license"</code> (UI.9) and the JSON-LD <code>license</code> property, which tells reusers and crawlers the content terms.</li>
+</ul>
+
+<h2>Checks that ran</h2>
+<ul>
+<li><strong>JSON-LD under a strict CSP.</strong> A page with <code>Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'</code> and an inline <code>&lt;script type="application/ld+json"&gt;</code> block (Chromium 141): the block was readable from the DOM and the console showed no CSP violation. JSON-LD is data, not executed script, so the strict policy needs no exception. Generate it with <code>json.dumps</code> and replace <code>&lt;/</code> with <code>&lt;\/</code> so no page text can close the script element.</li>
+<li><strong>Sitemap generation:</strong> 50,000 <code>&lt;url&gt;</code> entries with <code>xml.sax.saxutils.escape</code>, 25 ms, 4.3 MB, parsed back by <code>xml.etree</code> without error. Paths must be percent-encoded as well as XML-escaped (page names contain apostrophes and accents); use <code>urllib.parse.quote</code> on slugs, which GIT.6 already restricts.</li>
+</ul>
+
+<h2>HTTP caching for readers and crawlers</h2>
+<ul>
+<li><strong><code>ETag</code></strong> = hash of (content commit, render version, allowlist version); the same value keys the rendered-page cache (<a href="caching.html">caching</a>). Conditional requests answer <code>304</code> without touching the renderer. Crawlers use it.</li>
+<li><strong><code>Cache-Control: public, max-age=300</code></strong> on anonymous, public pages; <code>private, no-store</code> on anything seen by a logged-in user or touching GM-only content, so no shared cache can leak a GM page. <code>Vary: Cookie</code> on pages whose appearance depends on the session.</li>
+<li><strong>Compression:</strong> Apache <code>mod_deflate</code> (the rendered 9.7 KB sample page gzipped to 0.7 KB with zlib, so HTML compresses about 13 times).</li>
+<li><strong>Page speed:</strong> reading pages need one stylesheet and no script; images use the width ladder with <code>srcset</code> and explicit <code>width</code> and <code>height</code> from the media table (no layout shift), and <code>loading="lazy"</code> below the fold (MED.7, UI.2).</li>
+</ul>
+
+<h2>Items this changes</h2>
+<ul>
+<li>SEARCH.9 gains: canonical from configuration, <code>noindex</code> header rules, GM-only exclusion test, sitemap index and queue job, JSON-LD without <code>SearchAction</code>, 301 for renamed slugs (GIT.6 adds the alias redirect).</li>
+<li>UI.2 and UI.9: head template, <code>rel="license"</code>.</li>
+<li>MED.7: <code>alt</code> text is part of the <code>media:</code> syntax and required by the editor (also an accessibility rule, <a href="accessibility.html">RES.18</a>).</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Search engines' current guidance: Google's structured-data and sitelinks documentation and the sitemaps.org protocol were unreachable (connection refused by the session's proxy). The limits and the sitelinks search-box change are from memory.</li>
+<li>Whether crawlers pick up the images in JSON-LD or Open Graph: not tested; no external crawler is available.</li>
+<li>Core Web Vitals scores: no real page exists yet; re-measure after UI.2 with Lighthouse (Apache-2.0, 13.5.0 on npm).</li>
+</ul>
+</main></body></html>

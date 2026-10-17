@@ -100,8 +100,9 @@ Issue: [#15](https://github.com/dwhagar/spakr/issues/15)
 - [ ] **RND.2** LaTeX math rendered server-side to static markup [0.3] — needs: RND.1, RES.2
 - [ ] **RND.3** HTML sanitiser with the admin-approved allowlist [0.3] — needs: RND.1, RES.3
 - [ ] **RND.4** Strict Content-Security-Policy and security headers (no inline script or style) [0.3] — needs: API.1, UI.1
-- [ ] **RND.5** Rendered-page cache keyed by revision [0.3] — needs: RND.1, GIT.2
+- [ ] **RND.5** Rendered-page cache keyed by content (commit, render version, allowlist version) [0.3] — needs: RND.1, GIT.2, RES.25
 - [ ] **RND.6** Preview endpoint [0.5] — needs: RND.1, RND.3, API.4
+- [ ] **RND.7** Link-status pass after the render cache: red links for missing pages, links to GM-only pages unwrapped for viewers without the GM role [0.6] — needs: RND.5, LNK.1, VIS.2
 
 ## AUTH: Accounts, roles and API keys
 
@@ -171,15 +172,15 @@ Issue: [#20](https://github.com/dwhagar/spakr/issues/20)
 Issue: [#21](https://github.com/dwhagar/spakr/issues/21)
 
 - [x] **SEARCH.1** Reconcile the page_search design in docs/design/database.html (type, summary, name/aliases, tags, settings, field text, indexes) [0.0]
-- [ ] **SEARCH.2** Search document builder: plain text of the Markdown plus title, summary, aliases, tags, settings and type-field text, written on every page save [0.2] — needs: GIT.5, DB.2, SEARCH.1
+- [ ] **SEARCH.2** Search document builder: plain text of the Markdown plus title, summary, aliases, tags, settings and type-field text (with split and joined token forms: 8d6 also d6, Mi-Go also migo), written on every page save [0.2] — needs: GIT.5, DB.2, SEARCH.1
 - [ ] **SEARCH.3** Full-text query endpoint over the full page index: natural and boolean modes, relevance ranking, highlighted snippets, pagination [0.6] — needs: SEARCH.2, VIS.2, RES.7
 - [ ] **SEARCH.4** Field search: type, setting, tag, name/title and type-specific fields (for example race, place, occupation) as API parameters and query syntax such as type:character setting:scifi tag:undead [0.6] — needs: SEARCH.3, ENT.1, LNK.5
 - [ ] **SEARCH.5** Filters and facet counts by type, setting and tag [0.6] — needs: SEARCH.4
 - [ ] **SEARCH.6** Visibility in search: GM-only pages excluded for users without the GM role, using the copied visibility column [0.6] — needs: SEARCH.3, VIS.2
 - [ ] **SEARCH.7** Name and alias autocomplete for search-as-you-type and the link picker [0.6] — needs: SEARCH.2
-- [ ] **SEARCH.8** Tokeniser decision: InnoDB default parser or ngram, minimum token size and stopword settings, set by the admin [0.6] — needs: SEARCH.2, RES.7
+- [ ] **SEARCH.8** MySQL FULLTEXT server settings as an install requirement (default parser, innodb_ft_min_token_size=2, stopwords off; they are server variables, not web settings): start-up check and admin screen warning; ngram only as an install-time choice [0.6] — needs: SEARCH.2, RES.7
 - [ ] **SEARCH.9** SEO metadata, sitemap.xml and robots.txt [0.6] — needs: GIT.5, VIS.2, RES.8
-- [ ] **SEARCH.10** Memory (Redis, per-process) and disk caches for rendered pages [0.6] — needs: RND.5, QUE.1
+- [ ] **SEARCH.10** Per-process memory (LRU) and disk caches for rendered pages, size cap, no Redis for it [0.6] — needs: RND.5, QUE.1, RES.25
 
 ## MED: Uploads and media
 
@@ -188,8 +189,8 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.1** Upload endpoint: type sniffing, size limits (10 MB, 100 MB video), safe-list [0.7] — needs: API.4, RES.9
 - [ ] **MED.2** Quarantine and admin override [0.7] — needs: MED.1
 - [ ] **MED.3** Hashed media directories; originals kept privately [0.7] — needs: MED.1
-- [ ] **MED.4** Image processing with ImageMagick as queue tasks (Pillow where measurably better) [0.7] — needs: MED.3, QUE.2, RES.10
-- [ ] **MED.5** Video and audio transcoding with ffmpeg as queue tasks [0.7] — needs: MED.3, QUE.2, RES.10
+- [ ] **MED.4** Image processing with ImageMagick as queue tasks: one process per upload writes the whole ladder under the spakr policy file (Pillow only to verify) [0.7] — needs: MED.3, QUE.2, RES.10
+- [ ] **MED.5** Video and audio transcoding with ffmpeg as queue tasks (probe first, protocol whitelist, forced input format, timeouts) [0.7] — needs: MED.3, QUE.2, RES.10
 - [ ] **MED.6** Gated thumbnail series, never enlarged [0.7] — needs: MED.4, MED.5
 - [ ] **MED.7** media: Markdown syntax and HTML5 players [0.7] — needs: RND.1, MED.6, UI.14
 - [ ] **MED.8** Admin purge of originals [0.7] — needs: MED.3, AUTH.3
@@ -236,16 +237,16 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 
 Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 
-- [ ] **RES.1** MultiMarkdown options: libmultimarkdown vs Python-Markdown extensions vs pandoc; what Ubuntu 24.04 ships [0.0]
-- [ ] **RES.2** Server-side LaTeX math: KaTeX, MathJax, latex2mathml or pandoc; static markup, no client script [0.0]
-- [ ] **RES.3** HTML sanitiser library (nh3, bleach or own) and how the admin allowlist maps onto it [0.0]
-- [ ] **RES.4** Git access from Python: GitPython, dulwich or the git binary via subprocess; locking and speed [0.0]
+- [x] **RES.1** MultiMarkdown options: libmultimarkdown vs Python-Markdown extensions vs pandoc; what Ubuntu 24.04 ships [0.0]
+- [x] **RES.2** Server-side LaTeX math: KaTeX, MathJax, latex2mathml or pandoc; static markup, no client script [0.0]
+- [x] **RES.3** HTML sanitiser library (nh3, bleach or own) and how the admin allowlist maps onto it [0.0]
+- [x] **RES.4** Git access from Python: GitPython, dulwich or the git binary via subprocess; locking and speed [0.0]
 - [x] **RES.5** Password hashing, sessions and CSRF: argon2-cffi and Flask extensions versus own code [0.0]
 - [x] **RES.6** Email through an external SMTP relay (never a local MTA): library, TLS modes, relay settings as configuration, SPF/DKIM notes [0.0]
-- [ ] **RES.7** Search approach: InnoDB FULLTEXT (default parser or ngram) versus an external engine; relevance trials on sample pages [0.0]
-- [ ] **RES.8** SEO libraries and markup: sitemap writer, canonical URLs, meta and structured data [0.0]
+- [x] **RES.7** Search approach: InnoDB FULLTEXT (default parser or ngram) versus an external engine; relevance trials on sample pages [0.0]
+- [x] **RES.8** SEO libraries and markup: sitemap writer, canonical URLs, meta and structured data [0.0]
 - [x] **RES.9** Upload type sniffing: python-magic or filetype, and whether to add a virus scan [0.0]
-- [ ] **RES.10** Media toolchain per operation: confirm the efficient choice (ImageMagick or Pillow for images; ffmpeg for all audio and video). ffmpeg and ImageMagick are preferred; Python libraries allowed where measurably better (builds on docs/research/media-processing.html) [0.0]
+- [x] **RES.10** Media toolchain per operation: confirm the efficient choice (ImageMagick or Pillow for images; ffmpeg for all audio and video). ffmpeg and ImageMagick are preferred; Python libraries allowed where measurably better (builds on docs/research/media-processing.html) [0.0]
 - [x] **RES.11** Front-end approach: plain JavaScript modules or a small library, build and asset-hashing tooling, CSP-compatible [0.0]
 - [x] **RES.12** Rate limiting: Flask-Limiter or own Redis counters [0.0]
 - [ ] **RES.13** Entity field definitions: choose the structured fields and front matter schema for each entity type [0.0]
@@ -260,6 +261,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.22** Is Node.js justified? Build-time-only tooling (esbuild or Vite versus none) for bundling, asset hashing and CSS processing; runtime stays Python; effect on install, CI and the CSP [0.0]
 - [x] **RES.23** Device range from small phone and foldable to tablet, desktop and big-screen TV: breakpoints and fluid type, foldable viewport segments, 10-foot layout and remote or keyboard focus navigation, safe areas, test matrix [0.0]
 - [x] **RES.24** Front-end component approach: plain modules versus web components versus a small library (size, accessibility, no inline script), plus state and routing for the API-driven client [0.0]
+- [x] **RES.25** Caching of rendered pages in memory and on disk: key by content, layers, eviction, link-status pass (docs/research/caching.html) [0.0]
 
 ## TST: Testing and sample content
 

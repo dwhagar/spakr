@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.25 Caching (memory and disk) - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.25: Caching rendered pages in memory and on disk</h1>
+<p><em>Research thread A, 2026-10-17. A new research item added because the brief names caching and no item covered it. Unblocks RND.5 and SEARCH.10; feeds QUE.4 and the HTTP headers in <a href="seo.html">RES.8</a>. Measurements on the same container as the other pages; Redis 7.0.15 and MySQL 8.0.46 from Ubuntu 24.04.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Cache the rendered page body, keyed by content, so nothing ever needs invalidating.</strong> Key = SHA-256 over (page id, git commit of the page content, render version, sanitiser allowlist version). An edit creates a new commit, so a new key; a code release or an allowlist change bumps a version, so a new key. Old entries are never wrong, only unused, and are removed by size.</li>
+<li><strong>Two layers: a per-process in-memory LRU, then files on disk.</strong> No Redis for rendered pages. Redis stays for what must be shared and changes constantly (the queue, rate-limit counters) as decided by thread B. This reads "memory (Redis, per-process) and disk caches" in SEARCH.10 as: per-process memory and disk; Redis is not needed for it.</li>
+<li><strong>Disk layout:</strong> <code>cache/render/ab/cd/&lt;key&gt;.html</code> (two directory levels from the key). Write to a temporary file and <code>os.replace</code> it into place (atomic, so a reader never sees half a file; verified pattern used for <code>config.json</code> in <a href="settings-config.html">RES.20</a>). The operating system's page cache is the shared memory cache: a warm read took 5 microseconds.</li>
+<li><strong>In-memory layer:</strong> a bounded LRU (for example <code>cachetools.LRUCache</code>, MIT, or a small <code>OrderedDict</code>) of the last 200 rendered bodies per web process (about 20 KB each, so a few MB per process). It removes even the file read for hot pages such as the home page.</li>
+<li><strong>Cache what is the same for every viewer, and nothing that depends on the user.</strong> The cached unit is the sanitised body fragment. The page shell (menus, login state, theme) is rendered fresh per request; it is cheap. A cached fragment is never shared across visibility levels because in 1.0 visibility is per page, not per block.</li>
+<li><strong>Link status is resolved after the cache, in one batch pass.</strong> Wiki links in the cached fragment are stored as plain <code>&lt;a class="wikilink" href="/wiki/slug"&gt;</code>. At response time one SQL query asks which of those slugs exist and are visible to this viewer, and a regular-expression pass marks missing ones (red links) and unwraps links to GM-only pages for readers without the GM role. Measured: 33 microseconds for 60 links on a 15 KB fragment, plus one indexed query. This keeps the cache valid when a target page is created, renamed, deleted or hidden, and cannot leak a hidden page's name through the cache (VIS.3).</li>
+<li><strong>Stampedes:</strong> on a miss, take a per-key lock (an exclusive <code>flock</code> on <code>cache/locks/&lt;key-prefix&gt;</code>), re-check the file, render, write, release. Concurrent readers of a new page wait for one render instead of all running Node for the maths.</li>
+<li><strong>Size limit and eviction:</strong> an admin setting, default 256 MB for the render cache. A scheduled queue job (QUE.4) deletes the oldest files by modification time beyond the cap. Files are tiny: the 9.7 KB sample page; 50,000 such pages would be about 0.5 GB, hence a cap, not a promise of everything cached.</li>
+<li><strong>Warm-up:</strong> after a version bump (release, allowlist approval) the queue job re-renders the most-viewed and most recently edited pages first (QUE.4); the rest render on demand.</li>
+<li><strong>HTTP caching sits on top:</strong> the same key is the page's <code>ETag</code>; conditional requests answer 304 without even reading the cache. Rules for <code>Cache-Control</code> and GM-only pages are on the <a href="seo.html">SEO page</a>. Apache's <code>mod_cache</code> is not recommended for 1.0: invalidation and the risk of serving a GM page from a shared cache outweigh the gain.</li>
+</ul>
+
+<h2>Measurements</h2>
+<p>Rendered sample page of 9.7 KB (the sample document repeated 10 times, Markdown then sanitised). Mean over 2,000 runs (200 for rendering, 20 for the Node run).</p>
+<table><tr><th>Operation</th><th>Time</th></tr>
+<tr><td>In-process LRU dictionary lookup</td><td>0.2 microseconds</td></tr>
+<tr><td>Read a file from disk, warm in the operating system's cache</td><td>5.3 microseconds</td></tr>
+<tr><td>Redis <code>GET</code> over TCP on localhost</td><td>110 microseconds</td></tr>
+<tr><td>MySQL <code>SELECT</code> of the blob by primary key</td><td>247 microseconds</td></tr>
+<tr><td>Render on a miss: Markdown and sanitiser, no maths</td><td>13.3 ms</td></tr>
+<tr><td>Render on a miss with maths: add Node start and 20 formulas</td><td>about 60 to 70 ms more (Node start plus 20 formulas, see <a href="math-rendering.html">RES.2</a>)</td></tr>
+<tr><td>Link status pass (60 links) after the cache</td><td>33 microseconds, plus one indexed query</td></tr>
+</table>
+<p>Every cache layer is more than 50 times cheaper than rendering, and all of them are far below the cost of the rest of a request (database, templates), so the choice among them is about simplicity, not speed. Files and memory need no extra service, survive or rebuild trivially, and make Redis outages irrelevant to page reads. The MySQL row is the worst of the four and would also bloat backups.</p>
+
+<h2>Other things considered for caching</h2>
+<table><tr><th>Candidate</th><th>Decision</th></tr>
+<tr><td>Search results</td><td>No cache for 1.0: queries took 2 ms (5,000 pages) to 36 ms median (50,000 pages) (<a href="search.html">RES.7</a>). If a facet-count query is slow, cache it for 60 seconds in memory.</td></tr>
+<tr><td>Sitemap files and the feed</td><td>Generated files on disk, rewritten by a job after changes (<a href="seo.html">RES.8</a>).</td></tr>
+<tr><td>Media variants</td><td>Not a cache: files in the hashed media directories, produced once.</td></tr>
+<tr><td>API list responses</td><td>HTTP validators only (<code>ETag</code>); no server-side cache.</td></tr>
+<tr><td>Redis as the shared cache</td><td>Not needed; adds a network hop and a failure mode. Revisit only with several web hosts.</td></tr>
+<tr><td>Templates, Jinja bytecode and the sanitiser <code>Cleaner</code></td><td>In-process (the Cleaner is built once per allowlist version, <a href="html-sanitising.html">RES.3</a>).</td></tr>
+<tr><td>Python <code>functools.lru_cache</code> on rendering</td><td>No: unbounded keys, per-process only, and it cannot hold the version in the key cleanly.</td></tr>
+</table>
+
+<h2>Items this changes</h2>
+<ul>
+<li><strong>RND.5</strong>: key and layout above; atomic writes; per-key lock; link-status pass as part of RND.5 or LNK.1.</li>
+<li><strong>SEARCH.10</strong>: per-process LRU plus disk cache; no Redis dependency for it; size cap setting; sitemap and feed generation share the disk cache directory.</li>
+<li><strong>QUE.4</strong>: cache-prune and cache-warm jobs.</li>
+<li><strong>VIS.3</strong>: leak test for cached pages: a GM-only page title must not appear for a reader through a cached neighbour page's links.</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Behaviour under mod_wsgi with several daemon processes (the memory LRU is per process by design; the file layer is shared).</li>
+<li>Disk cache behaviour on a very slow or network filesystem (single local disk assumed).</li>
+<li>Real page sizes and hit rates; the sample document was synthetic. Add hit and miss counters to the admin status screen so the cap can be tuned from facts.</li>
+</ul>
+</main></body></html>

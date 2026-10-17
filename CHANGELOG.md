@@ -5,6 +5,17 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 ## [Unreleased]
 
 ### Added
+- Content-side research (RES.1, RES.2, RES.3, RES.4, RES.7, RES.8, RES.10, RES.11 done; new RES.25 caching done) as pages under `docs/research` with a research index, backed by experiments on Ubuntu 24.04: Markdown engines compared, MathML maths with Temml, the nh3 sanitiser against 23 hostile inputs, git access benchmarks and a locking test, MySQL FULLTEXT trials up to 50,000 pages, ImageMagick policy and ffmpeg checks, a strict-CSP browser test and cache timings. Prototype scripts in `docs/research/poc/`; tested ImageMagick policy in `examples/imagemagick-policy.xml`.
+- New item RND.7 (link-status pass after the render cache).
+
+### Changed
+- Markdown is Python-Markdown with MultiMarkdown-style extensions and YAML front matter (no true MultiMarkdown engine is packaged for Ubuntu 24.04); maths is rendered to MathML by Temml; sanitising is nh3 with a fixed Markdown baseline plus admin-approved tags (RND.1 to RND.3). Plan pages (architecture, content, data model, deployment) updated to match.
+- Git access is the `git` binary under an exclusive `flock` (GIT.1); rendered pages are cached by content key in per-process memory plus disk, with no Redis (RND.5, SEARCH.10, now needing RES.25).
+- Search: MySQL FULLTEXT server settings (`innodb_ft_min_token_size=2`, stopwords off) are an install requirement with a start-up check, not admin web settings (SEARCH.8); the search document adds split and joined token forms (SEARCH.2).
+- Media: one ImageMagick process writes the whole width ladder under a tight policy file; ffmpeg runs with a protocol whitelist and timeouts (MED.4, MED.5).
+- Open questions added: accept a MultiMarkdown-compatible dialect (RES.1) and Node.js at runtime for maths (RES.2).
+
+### Added
 - Web layer research (RES.11, RES.21, RES.22, RES.23, RES.24 done): three pages under `docs/research` (web-layer, web-devices, web-components) and a tested responsive prototype in `docs/research/web-prototype` (reading page, editor, light and dark, TV mode; 36 page loads at phone to 4K sizes with no overflow, no axe-core violations and no CSP violations). Decisions proposed: no Node.js anywhere in the product, hand-written modern CSS with tokens, no-build vanilla ES modules (Preact with htm held in reserve), textarea editor with server preview, native dialog lightbox and media controls, Lucide icon sprite, system fonts, manifest without service worker.
 - New items UI.17 (Python asset tooling and size budgets), UI.18 (web app manifest), UI.19 (search combobox and link picker).
 - Database layer (DB.1, DB.5, first part of DB.2): `spakr.db` with a SQLAlchemy engine (MySQL through PyMySQL, utf8mb4, optional unix socket), Alembic migrations 0001 (schema version, config, users, roles and permissions with seeds, settings, audit log) and 0002 (pages, aliases, revisions, tags, relation kinds, relations, links), and an integer schema version in the `schema_version` table that counts up with every migration (`get_schema_version`, `SCHEMA_VERSION`, `schema_status`). `spakr init-db` creates the data folders and applies migrations; `spakr db-version` prints applied and expected versions. Tests run on SQLite always and on MySQL 8 when `SPAKR_TEST_DATABASE_URL` is set (the daily workflow starts a MySQL service).

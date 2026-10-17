@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.10 Media toolchain per operation - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.10: Media toolchain per operation</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks MED.4 and MED.5; feeds MED.6. Builds on <a href="media-processing.html">media processing</a> and <a href="uploads.html">RES.9</a> (type sniffing, thread B). Experiments on Ubuntu 24.04.5: ImageMagick 6.9.12-98, ffmpeg 6.1.1, Pillow 13.0.0 (PyPI).</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Images: ImageMagick as a policy-limited subprocess.</strong> Pillow is faster, but not by enough to matter, produces larger files, and runs inside the worker process (below). Pillow stays for the cheap pre-checks (does it decode, what are the dimensions) as already decided in RES.9.</li>
+<li><strong>Video and audio: ffmpeg and ffprobe, always</strong> (no Python alternative exists that is measurably better). Codecs available in Ubuntu's build: libx264, libx265, libvpx and VP9, libsvtav1, libaom, libopus, libvorbis, libmp3lame, aac, libwebp (checked with <code>ffmpeg -encoders</code>).</li>
+<li><strong>Ship a tight ImageMagick policy</strong>, <code>examples/imagemagick-policy.xml</code>, loaded for the worker only through <code>MAGICK_CONFIGURE_PATH</code> so the system file in <code>/etc</code> is untouched. The Ubuntu default policy blocks only network delegates and <code>@file</code> paths. <strong>It still lets <code>text:/etc/hostname</code> read an arbitrary file into an image</strong> (verified: it produced an output image). Under our policy the same command fails with "not allowed by the security policy".</li>
+<li><strong>Always pass an explicit format prefix</strong> on input (<code>jpeg:in</code>, <code>png:in</code>) and on output (<code>webp:out.webp</code>) chosen from the already sniffed type, and an argument list with no shell.</li>
+<li><strong>ffmpeg input is pinned too:</strong> <code>-protocol_whitelist file,pipe</code> and, where the type is known, <code>-f mov</code> or <code>-f matroska</code> before <code>-i</code>. Playlist-style inputs (HLS <code>.m3u8</code>, <code>concat</code>) are the classic way to make ffmpeg read other files or fetch URLs; tested below.</li>
+<li><strong>Limit each job with its own process limits:</strong> wall-clock timeout (<code>timeout</code> or <code>subprocess</code>'s own), <code>nice</code>/<code>ionice</code>, and memory by cgroup (systemd <code>MemoryMax</code>), <strong>not</strong> <code>RLIMIT_AS</code>: <code>prlimit --as=300000000</code> made ffmpeg fail at start-up ("Error while opening decoder") because its threads reserve address space.</li>
+</ul>
+
+<h2>Image operations: ImageMagick against Pillow</h2>
+<p>A 4000 x 3000 JPEG of 3.6 MB (a synthetic photograph-like image), producing WebP at quality 80. Mean of 5 after a warm-up.</p>
+<table><tr><th>Task</th><th>Time</th><th>Output</th></tr>
+<tr><td>ImageMagick 6: one 1280-wide WebP</td><td>418 ms</td><td>259 KB</td></tr>
+<tr><td>ImageMagick 6: 4-size ladder (1920, 1280, 640, 320), four processes</td><td>1,639 ms</td><td>-</td></tr>
+<tr><td>ImageMagick 6: same ladder in one process (decode once, <code>mpr:</code> register)</td><td>1,183 ms</td><td>same</td></tr>
+<tr><td>Pillow 13: one 1280-wide WebP</td><td>397 ms</td><td>-</td></tr>
+<tr><td>Pillow 13: 4-size ladder, JPEG draft mode, one decode</td><td><strong>808 ms</strong></td><td>294 KB for the 1280 variant (14 percent larger at the same quality number)</td></tr>
+</table>
+<p><strong>Verdict:</strong> the ladder is 1.5 times faster in Pillow, a difference of about 0.4 s on a job that runs in a queue worker, nobody waiting. ImageMagick gave smaller files, strips metadata and rotates by EXIF in one command, converts animated GIFs to animated WebP with no extra code (checked under our policy), runs outside the worker's memory and, because it is a process, a crash or hang cannot take the worker down; it also reads limits from the policy file. That is not "measurably better" for Pillow in the sense the plan asks for. Recommended: <strong>one ImageMagick process per upload that writes the whole ladder</strong> (the <code>mpr:</code> form above), then probe the results with Pillow.</p>
+<ul>
+<li><strong>Output format:</strong> WebP for variants (every current browser reads it); keep GIF/animated as WebP; keep one JPEG poster per video. ImageMagick 6 on Ubuntu can read AVIF and HEIC but <strong>not write them</strong> (<code>convert -list format</code> shows <code>r--</code>); Pillow 13 can write AVIF. AVIF is a later option, through Pillow, if file sizes matter.</li>
+<li><strong>Never enlarge</strong> (already decided): <code>-resize 1280x&gt;</code> (the <code>&gt;</code> means only shrink) and skip any ladder step not smaller than the original (MED.6).</li>
+<li><strong>Metadata:</strong> <code>-strip</code> removes EXIF including GPS location; <code>-auto-orient</code> first so the picture stays upright. Colour profile handling not tested.</li>
+</ul>
+
+<h2>The policy, tested</h2>
+<p>File: <a href="https://github.com/dwhagar/spakr/blob/main/examples/imagemagick-policy.xml"><code>examples/imagemagick-policy.xml</code></a>. Limits: 256 MiB memory, 64 megapixels area, 16,000 pixels width and height, 1 GiB disk, 30 s time, 2 threads. All coders off except PNG, JPEG, GIF and WebP (in ImageMagick 6 the coder allow-list is the <code>module</code> domain; <code>coder</code> is the ImageMagick 7 name, and the first attempt with it blocked everything).</p>
+<table><tr><th>Input</th><th>Ubuntu default policy</th><th>spakr policy</th></tr>
+<tr><td>real PNG and JPEG</td><td>converted</td><td>converted</td></tr>
+<tr><td><code>text:/etc/hostname</code></td><td><strong>produced an image of the file's text</strong></td><td>blocked (TEXT)</td></tr>
+<tr><td>MVG vector script referencing <code>/etc/hostname</code> and a URL</td><td>not decoded here (format not recognised from the file; do not rely on it)</td><td>blocked (MVG)</td></tr>
+<tr><td><code>label:@/etc/hostname</code>, <code>caption:@file</code></td><td>blocked (<code>@</code> path rule)</td><td>blocked</td></tr>
+<tr><td><code>msl:</code>, <code>ephemeral:</code></td><td><code>ephemeral:</code> failed to open; <code>msl:</code> produced no image (not investigated further)</td><td>both failed to open</td></tr>
+<tr><td>PNG header declaring 30,000 x 30,000 pixels with almost no data</td><td>stopped: "cache resources exhausted"</td><td>stopped earlier: "width exceeds user limit"</td></tr>
+<tr><td>12 MP JPEG to 1920-wide WebP</td><td>works</td><td>works in 0.69 s</td></tr>
+<tr><td>animated GIF to animated WebP</td><td>works</td><td>works (two frames kept)</td></tr>
+</table>
+<p>The policy also forbids creating images from <code>xc:</code> and similar pseudo-formats: the worker never needs them, but tests that build images with ImageMagick must use the default policy (or Pillow).</p>
+
+<h2>ffmpeg operations and policy</h2>
+<table><tr><th>Operation</th><th>Command shape</th><th>Measured (5 s, 1280x720 H.264 test clip)</th></tr>
+<tr><td>Probe</td><td><code>ffprobe -v error -show_entries format=format_name,duration -of json</code> with <code>-protocol_whitelist file,pipe</code></td><td>instant; gave <code>mov,mp4,...</code> and 5.0 s</td></tr>
+<tr><td>480p MP4 (H.264, AAC, <code>+faststart</code>)</td><td><code>-vf scale=-2:480 -c:v libx264 -preset veryfast -crf 28 -c:a aac</code></td><td>1.0 s wall; 83 KB</td></tr>
+<tr><td>WebM VP9 and Opus</td><td><code>-c:v libvpx-vp9 -b:v 0 -crf 34 -deadline good -cpu-used 5 ... -c:a libopus</code></td><td>3.5 s wall; 139 KB. Optional second rendition; MP4 plays everywhere, so WebM is only worth it if the admin asks.</td></tr>
+<tr><td>Poster frame</td><td><code>-ss 1 -frames:v 1 -vf scale=640:-2 poster.jpg</code></td><td>0.16 s; 16 KB</td></tr>
+<tr><td>Audio to Opus (or MP3 fallback)</td><td><code>-vn -c:a libopus -b:a 96k</code></td><td>0.13 s; 73 KB (5 s)</td></tr>
+</table>
+<ul>
+<li><strong>Playlist input is refused.</strong> A <code>.m3u8</code> file pointing at <code>file:///etc/hostname</code> was blocked by ffmpeg's extension check by default and, with <code>-protocol_whitelist file,pipe -f mov</code> forced, the input was rejected as "moov atom not found": the file was never read as media.</li>
+<li><strong>Timeouts:</strong> a 60-second 1080p test source was stopped by <code>timeout 1</code> with exit code 124; wrap every job in a timeout sized to the file length (for example 4 times the duration, at least 60 s) and a hard maximum.</li>
+<li><strong>Input limits before transcoding:</strong> from <code>ffprobe</code> reject files over the admin's maximum duration, resolution (suggested 3840x2160) and stream count (one video, at most two audio, no data or attachment streams); copy only audio and video streams with <code>-map 0:v:0 -map 0:a:0?</code>.</li>
+<li><strong>Metadata:</strong> <code>-map_metadata -1</code> strips tags and GPS from the output; keep the original privately as decided.</li>
+<li><strong>Threads:</strong> <code>-threads 2</code> by default, admin adjustable, so one upload cannot take every core from the website.</li>
+</ul>
+
+<h2>Sandboxing</h2>
+<ul>
+<li>Run the worker as an unprivileged user with no network if possible. As a systemd unit (we have no systemd in this container, so <strong>these directives were not run here</strong>): <code>NoNewPrivileges=yes</code>, <code>ProtectSystem=strict</code>, <code>ProtectHome=yes</code>, <code>PrivateTmp=yes</code>, <code>PrivateNetwork=yes</code> only if Redis is reached over a Unix socket (otherwise <code>IPAddressDeny=any</code> with an allow for localhost), <code>ReadWritePaths=</code> the media directories, <code>MemoryMax=</code>, <code>TasksMax=</code>, <code>CPUQuota=</code> and <code>SystemCallFilter=@system-service</code>. The queue unit examples (FND.6) carry them.</li>
+<li><code>bubblewrap</code> and <code>firejail</code> are not installed on this image and not in the plan; systemd's own sandboxing is enough for one host.</li>
+<li>Per-job directories: each job reads one input file and writes into a fresh temporary directory, then moves the results into the hashed media directory after success. A failed job leaves nothing behind but a log line.</li>
+</ul>
+
+<h2>Items this changes</h2>
+<ul>
+<li><strong>MED.4:</strong> one ImageMagick process per upload writes the whole ladder (policy file, explicit prefixes, <code>-resize WxH&gt;</code>, <code>-strip</code>, <code>-auto-orient</code>); Pillow only for verification.</li>
+<li><strong>MED.5:</strong> probe first, limits, protocol whitelist, forced input format, timeouts, <code>-map_metadata -1</code>.</li>
+<li><strong>FND.6 / OPS.7:</strong> the policy file is installed to <code>/etc/spakr/imagemagick/policy.xml</code>; the worker unit sets <code>MAGICK_CONFIGURE_PATH</code>.</li>
+<li><strong>TST:</strong> keep the table above as security tests: each hostile input must fail with the policy loaded.</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>The systemd directives and cgroup limits (no systemd in this container).</li>
+<li>Pillow 10.2 (the apt version) against 13.0; B's packaging decision uses the PyPI version.</li>
+<li>Quality comparison beyond file size (no visual or SSIM check), real photographs (the test image was synthetic), colour-profile and HDR handling, and large videos or long encodes under memory limits.</li>
+<li>ImageMagick 7 behaviour (24.04 ships 6.9.12; the policy domain names differ in 7). Ubuntu 26.04's ImageMagick version was not checked.</li>
+</ul>
+</main></body></html>

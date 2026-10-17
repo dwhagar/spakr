@@ -85,7 +85,7 @@ Software name, software version and API version are always present; the contact 
 
 <h2>Caching</h2>
 <ul>
-<li><strong>Memory</strong>: per-process LRU for hot small items (sessions' permission sets, settings, allowlist), and Redis for shared cache across WSGI processes. Planned library: <code>Flask-Caching</code> with a Redis backend.</li>
+<li><strong>Memory</strong>: per-process LRU for hot small items (sessions' permission sets, settings, allowlist) and for the last rendered page bodies. Redis is not used for rendered pages (decided in <a href="../research/caching.html">RES.25</a>: the disk cache is shared across WSGI processes and keyed by content, so it never needs invalidating); Redis remains for the queue and rate limits.</li>
 <li><strong>Disk</strong>: rendered page HTML keyed by git commit hash and visibility, and generated media variants, in a cache directory that is safe to delete (<code>FileSystemCache</code> or plain files). Apache serves static variants with long <code>Cache-Control</code> and ETags because their path contains the hash.</li>
 <li>Invalidation: a page save bumps its commit hash, which changes the key; the worker prunes stale entries. GM-only output is never put in a cache shared with public output (the key includes visibility).</li>
 </ul>

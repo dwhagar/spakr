@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.7 Search approach - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.7: Search approach</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks SEARCH.3 and SEARCH.8; changes SEARCH.2 and SEARCH.8 (see below); feeds SEARCH.4 to SEARCH.7. Trials ran on a real MySQL 8.0.46 server (the Ubuntu 24.04 package) with the <code>page_search</code> table from the <a href="../design/database.html">database design</a>.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Use InnoDB FULLTEXT with the default parser</strong>, no external search engine for 1.0. It handles the three search modes in the design (name, all-field, field filters) at 2 ms (5,000 pages) to 36 ms median (50,000 pages) per query, adds no service to run, and the index lives in the same database and transactions as the rest.</li>
+<li><strong>Do not use the ngram parser.</strong> It fixed short tokens but was 10 to 25 times slower, and noisy for English (a search for <em>Varn</em> also returned <em>Urnevel Marne</em> and similar names through shared two-letter pieces).</li>
+<li><strong>Two server settings matter, and they are not application settings</strong> (this changes SEARCH.8): <code>innodb_ft_min_token_size=2</code> and <code>innodb_ft_enable_stopword=OFF</code>. They are read when MySQL starts, live in <code>mysqld.cnf</code>, and changing them means rebuilding the index. SEARCH.8 as written ("set by the admin" in the web interface) cannot work. Instead: install guide (DOC.3) tells the admin to set them, the application checks <code>@@innodb_ft_min_token_size</code> and <code>@@innodb_ft_enable_stopword</code> at start-up and warns on the admin screen when they are wrong, and the search document builder works well enough with the defaults (below) so nothing breaks if they are not set.</li>
+<li><strong>Rank with a title boost</strong> by combining the two indexes in the query: <code>3 * MATCH(title, aliases_text) + MATCH(all columns)</code>. Plain all-column ranking put a page full of the word first; the combined score fixed it (below).</li>
+<li><strong>Snippets and highlighting are the application's job</strong>; MySQL does not produce them. Cut them from <code>body</code> in Python for the top 20 results only.</li>
+<li><strong>Keep the index behind one <code>SearchIndex</code> interface</strong> (SEARCH.2, SEARCH.3) so an external engine can replace it later without touching the API.</li>
+</ul>
+
+<h2>The trials</h2>
+<p>Corpus: 5,000 generated pages (random names, a 4,000-word Zipf vocabulary, 150 to 450 words each) plus 13 hand-written pages shaped like real game content: names with apostrophes and hyphens, accents, dice notation, abbreviations, stop-word titles. The same queries ran under three configurations. Numbers are single-query latency on the container; the 50,000-page run is the same generator.</p>
+<table><tr><th>Query</th><th>Default (min token 3, stopwords on)</th><th>min token 2, stopwords off</th><th>ngram parser</th></tr>
+<tr><td><code>Ilsa Varn</code>, <code>Ilsa the Red</code> (alias)</td><td>found, rank 1</td><td>not run</td><td>found, rank 1 (title boost)</td></tr>
+<tr><td><code>Dun'Kar</code> and <code>Dun Kar</code></td><td>found, rank 1</td><td>not run</td><td>not run</td></tr>
+<tr><td><code>Éowyn</code> and <code>Eowyn</code></td><td>both find <em>Éowyn Brightwater</em> (accent-insensitive collation)</td><td>not run</td><td>not run</td></tr>
+<tr><td><code>Mi-Go</code>, <code>Mi Go</code></td><td><strong>no results</strong> (both tokens are 2 characters)</td><td>found</td><td>found</td></tr>
+<tr><td><code>HP</code>, <code>AI</code></td><td><strong>no results</strong></td><td>found</td><td>found</td></tr>
+<tr><td><code>The Void</code></td><td>found only with the title boost (rank 1: 41.7 against 2.2)</td><td>found, rank 1</td><td>found</td></tr>
+<tr><td><code>dawn</code> (village page, sword page, many body hits)</td><td>plain all-column ranking: village page first (1.59) but <em>Sword of Dawn</em> fell below body-only hits (0.4); with the title boost 34.8 and 33.7 against 0.4</td><td>same order with the boost</td><td>same order (101 and 99)</td></tr>
+<tr><td><code>d6</code> when the text says <code>8d6</code></td><td>no results (correct: the token is <code>8d6</code>)</td><td>no results</td><td>found (as a fragment)</td></tr>
+<tr><td><code>8d6</code></td><td>found, rank 1</td><td>not run</td><td>not run</td></tr>
+<tr><td><code>+2</code></td><td>no results</td><td>no results</td><td>not run</td></tr>
+<tr><td><code>"fire damage"</code> (phrase, boolean mode) and <code>fire damage</code></td><td>found, rank 1 (boolean phrase)</td><td>not run</td><td>found, rank 1 (natural mode)</td></tr>
+<tr><td><code>Var*</code>, <code>Va*</code>, <code>Ils*</code> (prefix on names, boolean mode)</td><td>found (two-letter prefix <code>Va*</code> works)</td><td>not run</td><td>n/a</td></tr>
+<tr><td><code>telekinesis</code>, <code>occupation: pilot</code> (type-field text)</td><td>found</td><td>not run</td><td>not run</td></tr>
+<tr><td>Latency, 5,000 pages (two-word natural queries)</td><td>2.0 ms mean over 200 queries</td><td>not run</td><td>4 to 52 ms per query (single runs)</td></tr>
+<tr><td>Latency, 50,000 pages</td><td>median 36 ms, 95th percentile 127 ms (many hits on common words)</td><td>n/a</td><td>n/a</td></tr>
+</table>
+
+<h2>What the trials taught us</h2>
+<ul>
+<li><strong>Short tokens are the real RPG problem.</strong> Game text is full of two-letter terms: HP, AC, XP, AI, GM, <em>Mi-Go</em>, <em>Ka-Tet</em>. With MySQL's defaults none of them can be found. Setting the minimum to 2 fixes it at the cost of a larger index (not measured: InnoDB keeps FULLTEXT data in auxiliary tables that <code>information_schema</code> reports as zero, so the size effect is unknown). This is why the setting should be in the install guide, not left optional.</li>
+<li><strong>Dice and stat notation is one token.</strong> <code>8d6</code> is found; <code>d6</code> is not found inside it. SEARCH.2 (document builder) should add the split forms to the field text: for each token like <code>8d6</code> also write <code>d6</code>; for hyphenated names also write the joined form (<code>migo</code>); for names with apostrophes also the joined form (<code>dunkar</code>). This is cheap and works under the default settings too.</li>
+<li><strong>Stop-words only hurt titles.</strong> With them on, <em>The Void</em> still worked, because the other word carries it. A page named just "It" or "Them" (horror fiction has these) would be unfindable, which is another reason to turn the list off.</li>
+<li><strong>No 50 percent rule.</strong> InnoDB natural-language mode returns results for words that occur in most pages (unlike MyISAM), so an all-pages word simply ranks low; no surprises for editors searching common terms.</li>
+<li><strong>Updates are cheap.</strong> A single-row update with FULLTEXT cost 2.8 ms (50,000 rows); loading 50,000 pages took 26 s. The index becomes visible when the transaction commits, which is the behaviour we want (write git first, then MySQL, as in <a href="git-content-store.html">RES.4</a>).</li>
+<li><strong>Size:</strong> 50,000 generated pages (about 350 words each) were 174 MB of table data. A real game database will be far smaller.</li>
+</ul>
+
+<h2>Alternatives</h2>
+<table><tr><th>Option</th><th>Verdict</th></tr>
+<tr><td>InnoDB FULLTEXT, default parser</td><td><strong>Chosen.</strong> Right size for thousands of pages; one less service; the same database holds visibility, tags and settings, so one query applies all filters (SEARCH.4 to SEARCH.6).</td></tr>
+<tr><td>MariaDB 10.11 (also on Ubuntu 24.04, <code>mariadb-server</code> 10.11.14)</td><td>Same FULLTEXT variable names and similar behaviour (not run here). The plan says MySQL; keep the SQL portable.</td></tr>
+<tr><td>SQLite FTS5</td><td>Excellent ranking (BM25), snippets and highlighting built in, trigram tokenizer. Would add a second database file to keep in sync and back up. Considered the best fallback if FULLTEXT ranking proves too weak; not run.</td></tr>
+<tr><td>Meilisearch, Typesense, OpenSearch or Elasticsearch, Manticore</td><td>None is in the Ubuntu 24.04 archive (checked with <code>apt-cache policy</code>; only the old <code>sphinxsearch</code> 2.2.11 is). Typo tolerance and faceting are good, but each is another service to install, secure, back up and keep in step with git. Not justified at this size. <em>Licences and current versions not verified</em> (project sites were not reachable from this session).</td></tr>
+<tr><td>Whoosh</td><td>apt <code>python3-whoosh</code> 2.7.4; unmaintained for years. Rejected.</td></tr>
+<tr><td>ngram parser</td><td>Rejected (slow, noisy) except as an admin choice for a site with Chinese, Japanese or Korean text (a search for <code>龙</code> found nothing under the default parser, as expected).</td></tr>
+</table>
+
+<h2>Effect on the plan</h2>
+<ul>
+<li><strong>SEARCH.8</strong> becomes "install requirement and start-up check for the two server variables" (not an admin web setting); the ngram choice stays an install-time choice. Text updated in TODO.md.</li>
+<li><strong>SEARCH.2</strong> additionally writes the split and joined token forms described above.</li>
+<li><strong>SEARCH.3</strong> uses the title-boosted combined query and builds snippets in Python; no 50 percent rule to work around.</li>
+<li><strong>DOC.3 and FND.9:</strong> the install guide lists <code>innodb_ft_min_token_size=2</code> and <code>innodb_ft_enable_stopword=OFF</code>; <code>spakr reindex</code> rebuilds the index after a change (<code>OPTIMIZE TABLE</code> or a rebuild).</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Relevance on real wiki text: the corpus words were random; the hand-written pages tested ranking rules, not language. Re-run the trial when TST.3 (sample content) exists.</li>
+<li>MariaDB behaviour, SQLite FTS5 and the external engines were not run.</li>
+<li>Index size effect of <code>min_token_size=2</code> on real text.</li>
+</ul>
+</main></body></html>

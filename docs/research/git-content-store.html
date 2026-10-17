@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.4 Git access for the content store - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.4: Git access from Python</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks GIT.1; feeds GIT.2 to GIT.7 and DB.3. Experiments on Ubuntu 24.04.5 with git 2.43.0 against a repository of 5,001 Markdown files and 178 commits, using dulwich 1.2.17, GitPython 3.2.1 and pygit2 1.20.1 from PyPI.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Call the <code>git</code> binary through <code>subprocess</code></strong> (argument lists, never a shell), behind one small <code>GitStore</code> class so the choice can change. Ubuntu 24.04 ships git 2.43.0; no Python git library is needed. This was the fastest write path, the only one with nothing to pin or audit, and it keeps every git behaviour (renames, <code>log --follow</code>, <code>gc</code>) exactly as users of the repository know it.</li>
+<li><strong>One non-bare repository</strong> owned by the app user. Page files live at <code>type/shard/slug.md</code> (the test used 50 shards per type, 5,000 pages) so no directory holds thousands of entries. The newest content is read straight from the working-tree file (5 microseconds when cached by the OS), history and old revisions come from git.</li>
+<li><strong>All writes go through one exclusive lock: <code>fcntl.flock</code> on a lock file</strong> beside the repository. Measured: with no lock, <strong>7 of 8 simultaneous commits failed</strong> with <code>fatal: Unable to create '.../index.lock'</code>; with the lock, 0 of 8 failed. The lock covers: check the base commit, write the file, <code>git add</code>, <code>git commit</code>, update the MySQL index row. It works across the web processes and the queue worker on one host (not over NFS).</li>
+<li><strong>Edit conflict detection (GIT.7)</strong> compares the commit that last touched the file (<code>git log -1 --format=%H -- path</code>, 3 to 18 ms) with the base commit the editor started from, inside the lock. Different pages never conflict; the same page conflicts only if it changed since the editor opened it.</li>
+<li><strong>Safe invocation:</strong> always <code>git -C repo</code>, a <code>--</code> before every path, slugs validated by GIT.6 (no <code>..</code>, no leading dash, no control characters), and <code>-c core.hooksPath=/dev/null -c commit.gpgsign=false -c core.quotepath=false</code> with <code>GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1</code> so no global setting changes behaviour (a stray signing configuration made dulwich's commit fail in testing). Author and committer are set per commit with <code>--author</code> and environment variables using the pseudonymous per-account identity from <a href="platform-conventions.html">platform conventions</a>.</li>
+<li><strong>Crash recovery:</strong> the store runs <code>git status --porcelain</code> under the lock at start-up and before each write; a dirty tree left by a crashed write is reset with <code>git checkout -- .</code> and <code>git clean</code> after being logged. <code>spakr fsck</code> (FND.9 candidate) runs <code>git fsck</code> and compares the MySQL index with the tree (DB.3).</li>
+<li><strong>Housekeeping:</strong> a weekly queue job runs <code>git gc --auto</code> (the test repository had 5,407 loose objects). Backups use <code>git bundle</code> as decided in <a href="backups.html">RES.17</a>.</li>
+</ul>
+
+<h2>Measurements</h2>
+<p>Mean of 20 runs after one warm-up, repository of 5,001 files, same machine, commit changes one file. Lower is better.</p>
+<table><tr><th>Operation</th><th>git subprocess</th><th>dulwich 1.2.17</th><th>pygit2 1.20.1</th><th>GitPython 3.2.1</th></tr>
+<tr><td>Add and commit one file</td><td><strong>25.7 ms</strong> (porcelain), 41.3 ms (plumbing with compare-and-swap <code>update-ref</code>)</td><td>186 ms</td><td>71 ms</td><td>211 ms</td></tr>
+<tr><td>Read file at HEAD</td><td>2.9 ms (<code>git show</code>)</td><td>0.9 ms</td><td><strong>0.03 ms</strong></td><td>1.7 ms</td></tr>
+<tr><td>History of one file (dozens of commits touching it)</td><td>17.8 ms (<code>git log -- path</code>)</td><td>146 ms (walker)</td><td>2.3 ms (manual walk, no <code>--follow</code>)</td><td>26 ms</td></tr>
+<tr><td>Diff between two commits for one file</td><td>3.0 ms</td><td>not measured</td><td>not measured</td><td>not measured</td></tr>
+</table>
+<p>A single edit costs 26 ms of git work; the other pieces of a save (Markdown to text for the search document, the MySQL write) are of the same order, so the git choice is not the limit. Reads of the current page come from the cache or the working tree, not from git.</p>
+
+<h2>The libraries</h2>
+<table><tr><th>Option</th><th>Licence</th><th>Assessment</th></tr>
+<tr><td><strong>git binary</strong> (chosen)</td><td>GPL-2.0, separate process, so no linking question</td><td>Fast writes and history, exact git semantics, nothing to pin. Cost: process start per call (about 3 ms) and parsing text output; mitigated by one <code>git cat-file --batch</code> reader process only if profiling shows a need.</td></tr>
+<tr><td>pygit2</td><td>GPL-2.0 with the libgit2 linking exception (as declared on PyPI)</td><td>Fastest reads by two orders of magnitude and a good commit time, but it is a C extension, a crash inside libgit2 takes the web process down, and path history needs a manual commit walk (no rename following). <strong>The upgrade path if profiling ever shows git reads matter</strong>; keep the <code>GitStore</code> interface so it can be swapped in.</td></tr>
+<tr><td>dulwich</td><td>Apache-2.0 or GPL-2.0-or-later</td><td>Pure Python, easy to deploy, but 7 to 8 times slower to commit here (it re-checks the index of 5,000 files) and 8 times slower for path history.</td></tr>
+<tr><td>GitPython</td><td>BSD-3-Clause</td><td>Mostly a wrapper around the git binary with its own overhead; slowest commit; leaked processes and file handles in long-running programs are a commonly reported problem (from general experience, not reproduced here). No advantage over calling git directly.</td></tr>
+</table>
+
+<h2>Design choices behind the numbers</h2>
+<ul>
+<li><strong>Working tree or bare plus plumbing?</strong> The plumbing route (hash-object, temporary index, write-tree, commit-tree, <code>update-ref</code> with the expected old value) costs 41 ms against 26 ms and gives an atomic compare-and-swap and no dirty tree. The simpler porcelain route is chosen because the lock already serialises writers and the recovery step handles the crash case. If a second writer ever appears (for example an import tool), the plumbing route is the fix.</li>
+<li><strong>Rename and move (GIT.6):</strong> <code>git mv</code> in the same locked commit, and keep old slugs as aliases in the database (they are also search aliases, <a href="search.html">RES.7</a>). <code>git log --follow</code> shows history across the rename (not benchmarked).</li>
+<li><strong>Revert (GIT.4):</strong> <code>git revert --no-edit</code> would revert the whole commit; page reverts should check out the old blob into the working tree and make a normal commit with <code>reverts_commit</code> recorded, as the database design already says.</li>
+<li><strong>Binary files stay out of git:</strong> media is not in the content repository (originals and variants are on disk and in <code>media</code> tables), so the repository stays small text.</li>
+<li><strong>Locking in Python:</strong> open the lock file once per operation, <code>flock(LOCK_EX)</code> with a timeout (non-blocking attempts in a loop; give up after about 10 s with a retryable error), close in <code>finally</code>. In testing, forgetting to close the descriptor in a thread deadlocked every later writer: use a context manager.</li>
+</ul>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Scaling beyond 5,000 files and 178 commits: repository behaviour with 50,000 files was not measured (the content set for a game database should stay in the thousands; the numbers will grow with the file count, mostly for <code>git add</code> on the index).</li>
+<li>Behaviour on a network filesystem: <code>flock</code> is local-host only. The deployment is single host (<a href="apache-hosting.html">RES.16</a>).</li>
+<li>pygit2's rename-following history and its memory use under mod_wsgi.</li>
+</ul>
+</main></body></html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.11 Front-end approach and CSP - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="markdown-rendering.html">Markdown</a><a href="math-rendering.html">Math</a><a href="html-sanitising.html">Sanitising</a><a href="git-content-store.html">Git store</a><a href="search.html">Search</a><a href="seo.html">SEO</a><a href="media-tools.html">Media tools</a><a href="front-end.html">Front end</a><a href="caching.html">Caching</a></nav><main>
+<h1>RES.11: Front-end approach, CSP, dark mode and responsive base</h1>
+<p><em>Research thread A, 2026-10-17. Unblocks UI.1; feeds RND.4, UI.11 to UI.14. Research C owns the detailed questions RES.21 (CSS and design system), RES.22 (is Node justified), RES.23 (device range) and RES.24 (components); this page gives the evidence that holds under any of their answers: what the strict Content-Security-Policy allows, and the baseline for themes and layout. Browser checks ran in Chromium 141 through Playwright.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Reading is plain server-rendered HTML and CSS; JavaScript is an enhancement.</strong> Public pages (UI.2) need no script. JavaScript is for the editor, search-as-you-type, forms and admin screens, as native ES modules served from our origin with a plain <code>&lt;script type="module" src="..."&gt;</code>.</li>
+<li><strong>Start with no framework and no build step</strong> for 0.1 (UI.1): native modules, <code>fetch()</code> to <code>/api/v1</code>, and, where a component helps, standard custom elements (they work under the strict CSP, tested). Revisit a small library or bundler only when RES.22 and RES.24 decide; the CSP rules below constrain which ones qualify.</li>
+<li><strong>The strict policy is the target from the first commit</strong> (RND.4): <code>default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'</code>, with <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: strict-origin-when-cross-origin</code> and a restrictive <code>Permissions-Policy</code>. No nonces, no <code>'unsafe-inline'</code>, no <code>'unsafe-eval'</code>. TLS and HSTS belong to Apache and API.6, assumed in place.</li>
+<li><strong>Asset versioning without a bundler:</strong> serve scripts and styles with <code>Cache-Control: no-cache</code> plus an <code>ETag</code>; the browser revalidates and gets a tiny 304. A page links <code>app.css?v=&lt;hash&gt;</code> using a version string computed at start-up (hash of the file contents). For immutable caching later, a build step copies files to content-hashed names and rewrites relative <code>import</code> specifiers (about 40 lines of Python); do that only if RES.22 says Node or a build step is accepted anyway.</li>
+<li><strong>Editor:</strong> a plain <code>&lt;textarea&gt;</code> with the preview endpoint (RND.6) for 0.8. CodeMirror 6 (MIT; <code>codemirror</code> 6.0.2, <code>@codemirror/view</code> 6.43.14) gives syntax highlighting and accessibility work already done, but it must be bundled, so it is a RES.22-dependent upgrade, not a 1.0 requirement.</li>
+<li><strong>Themes:</strong> CSS custom properties for every colour, defaults from <code>prefers-color-scheme</code>, user override as a <code>data-theme</code> attribute on <code>&lt;html&gt;</code> written by the server from the stored preference (UI.12), so there is no inline script and no flash of the wrong theme. Same pattern as the plan pages' <code>style.css</code>.</li>
+<li><strong>Responsive base:</strong> mobile-first single column, fluid type, tables in a scroll wrapper (the renderer adds the wrapper, trusted markup), no horizontal page scroll at 360 px. Device ranges (foldables, TV) are RES.23.</li>
+</ul>
+
+<h2>What the strict CSP does and does not break (Chromium 141)</h2>
+<table><tr><th>Technique</th><th>Result under the policy</th><th>Consequence</th></tr>
+<tr><td>Inline <code>&lt;script&gt;</code></td><td><strong>Refused</strong> (console error, did not run)</td><td>No inline scripts or event-handler attributes. Pass data with <code>data-*</code> attributes or a JSON <code>&lt;script type="application/json"&gt;</code> (data blocks are not executed).</td></tr>
+<tr><td><code>style="..."</code> attributes in markup, including <code>innerHTML</code></td><td><strong>Refused</strong></td><td>Author HTML has <code>style</code> stripped (RES.3). The renderer emits classes, not styles. Libraries that emit style attributes (KaTeX's HTML output: 57 of them for one formula) are out.</td></tr>
+<tr><td><code>element.style.color = ...</code>, <code>style.cssText</code>, constructed stylesheets (<code>adoptedStyleSheets</code>)</td><td><strong>Work</strong></td><td>Scripted styling through the CSSOM is fine. <code>setAttribute('style', ...)</code> is blocked.</td></tr>
+<tr><td><code>eval()</code> and <code>new Function()</code></td><td><strong>Blocked</strong> (EvalError)</td><td>Libraries that compile templates or expressions at run time need a CSP-safe build or are excluded. Alpine's default build is documented to need <code>unsafe-eval</code> and ships a separate CSP build; htmx has an option to disable evaluation (both from their documentation as I know it, not tested here).</td></tr>
+<tr><td>External stylesheet and ES modules (static and dynamic <code>import()</code>), <code>fetch()</code> to our origin</td><td>Work</td><td>The planned structure.</td></tr>
+<tr><td>Custom elements (web components)</td><td>Work</td><td>A no-library component model is available.</td></tr>
+<tr><td>MathML from Temml with style attributes removed</td><td>Renders; display math stays a block through the shipped CSS class</td><td>See <a href="math-rendering.html">RES.2</a>.</td></tr>
+<tr><td><code>&lt;script type="application/ld+json"&gt;</code></td><td>Readable, no violation</td><td>See <a href="seo.html">RES.8</a>.</td></tr>
+<tr><td><code>import maps</code> (<code>&lt;script type="importmap"&gt;</code>)</td><td>Inline, so it needs a nonce or hash (not tested)</td><td>Avoid; use relative imports.</td></tr>
+</table>
+
+<h2>Dark mode and responsive checks</h2>
+<ul>
+<li>A test page with <code>color-scheme: light dark</code> and <code>light-dark()</code> colour tokens, loaded with the browser in each scheme, resolved to the dark values in the dark run (background <code>rgb(20, 22, 26)</code>, text <code>rgb(230, 232, 235)</code>) and the light values in the light run (white background, <code>rgb(27, 31, 36)</code> text), and the maths inherited the text colour. A screenshot of the dark run shows readable text and formulas.</li>
+<li>At a 390 px wide viewport the test page had no horizontal scroll (<code>scrollWidth</code> not larger than the viewport) in both schemes.</li>
+<li><code>light-dark()</code> works in this Chromium; it is a recent CSS function (browsers added it during 2024, from memory; no compatibility table could be fetched). <strong>For the production tokens use the plain <code>@media (prefers-color-scheme: dark)</code> variable override</strong> (as the plan pages do), which works in every browser, and <code>:root[data-theme=dark]</code> / <code>[data-theme=light]</code> overrides after it; <code>light-dark()</code> is an optional nicety. Always set <code>color-scheme</code> so form controls, scrollbars and the canvas colour follow.</li>
+<li>Container queries parsed without error in the test stylesheet; their layout effect was not tested (RES.21 and RES.23 decide how much to rely on them).</li>
+</ul>
+
+<h2>Library facts (npm registry, 2026-10-17)</h2>
+<table><tr><th>Package</th><th>Version</th><th>Licence</th><th>Note</th></tr>
+<tr><td>preact</td><td>11.0.1</td><td>MIT</td><td>Small virtual-DOM library; needs a build for JSX unless <code>htm</code> tagged templates are used.</td></tr>
+<tr><td>lit</td><td>3.3.3</td><td>BSD-3-Clause</td><td>Web components with templates; works as plain modules; its template system is documented as not needing <code>eval</code> (not tested here).</td></tr>
+<tr><td>htmx.org</td><td>2.0.11</td><td>0BSD</td><td>HTML-over-the-wire; the plan is JSON API plus a client, so it fits poorly.</td></tr>
+<tr><td>alpinejs</td><td>3.17.4</td><td>MIT</td><td>Needs its CSP build (see table above).</td></tr>
+<tr><td>esbuild</td><td>0.28.2</td><td>MIT</td><td>Single-binary bundler and minifier; build-time only (RES.22).</td></tr>
+<tr><td>vite</td><td>8.3.4</td><td>MIT</td><td>Heavier toolchain; not needed for this scope.</td></tr>
+<tr><td>codemirror / @codemirror/view</td><td>6.0.2 / 6.43.14</td><td>MIT</td><td>Editor component; bundle required.</td></tr>
+<tr><td>marked / dompurify</td><td>18.1.1 / 3.4.17</td><td>MIT / MPL-2.0 or Apache-2.0</td><td>Not used: rendering and sanitising are server-side so the preview matches the published page exactly.</td></tr>
+</table>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Firefox and Safari behaviour of any check above (only Chromium is installed here).</li>
+<li>Library behaviour under the policy for Alpine, htmx and the others (documentation knowledge only).</li>
+<li>Real-device layout: foldables and TV are in RES.23.</li>
+</ul>
+</main></body></html>
