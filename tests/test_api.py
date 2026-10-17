@@ -37,7 +37,7 @@ def client():
 @pytest.fixture
 def unconfigured(monkeypatch, tmp_path):
     monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
-    monkeypatch.delenv("SPAKR_CONFIG", raising=False)
+    monkeypatch.setenv("SPAKR_CONFIG", str(tmp_path / "config.json"))
     return create_app()
 
 
@@ -73,7 +73,7 @@ def test_no_config_file_fails_gracefully(unconfigured):
 
 
 def test_config_fixed_without_restart(monkeypatch, tmp_path):
-    monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SPAKR_CONFIG", str(tmp_path / "config.json"))
     client = create_app().test_client()
     assert client.get("/api/v1/health").status_code == 503
     good = tmp_path / "config.json"
@@ -83,7 +83,7 @@ def test_config_fixed_without_restart(monkeypatch, tmp_path):
 
 
 def test_invalid_config_is_reported_not_raised(monkeypatch, tmp_path):
-    monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SPAKR_CONFIG", str(tmp_path / "config.json"))
     bad = tmp_path / "config.json"
     bad.write_text("{not json")
     bad.chmod(0o600)
@@ -170,7 +170,7 @@ def test_user_agent():
 
 
 def test_wsgi_module_imports_without_config(monkeypatch, tmp_path):
-    monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SPAKR_CONFIG", str(tmp_path / "config.json"))
     import importlib
 
     from spakr import wsgi
