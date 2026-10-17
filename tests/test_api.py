@@ -10,6 +10,8 @@ from spakr import outbound
 from spakr.api import API_VERSION, create_app, integration
 from spakr.version import software_version
 
+_REAL_DATABASE_VERSIONS = integration.database_versions
+
 VALID_CONFIG = {
     "database": {"name": "t", "user": "u", "password": "pw"},
     "secrets": {"secret_key": "k" * 40},
@@ -24,7 +26,7 @@ def _no_ambient_config(monkeypatch):
 @pytest.fixture(autouse=True)
 def _database_up(monkeypatch):
     """Health tests do not need a live MySQL: report a database at the expected version."""
-    monkeypatch.setattr(integration, "database_versions", lambda config: (2, 2))
+    monkeypatch.setattr(integration, "database_versions", lambda config: (2, 2, "ok"))
 
 
 @pytest.fixture
@@ -52,7 +54,7 @@ def test_health_reports_versions(client):
 
 
 def test_health_degraded_when_database_unreachable(client, monkeypatch):
-    monkeypatch.setattr(integration, "database_versions", lambda config: (2, None))
+    monkeypatch.setattr(integration, "database_versions", lambda config: (2, None, "unavailable"))
     response = client.get("/api/v1/health")
     assert response.status_code == 503
     assert response.get_json()["database_version"]["state"] == "unavailable"
@@ -184,17 +186,30 @@ def test_openapi_served(client):
     json.dumps(spec)
 
 
-def test_database_version_reported_when_db_layer_present(monkeypatch):
-    import sys
-    import types
+@pytest.mark.parametrize(
+    ("applied", "state"),
+    [(None, "uninitialised"), (1, "needs-upgrade"), (2, "ok"), (3, "newer-than-code")],
+)
+def test_database_versions_states(monkeypatch, applied, state):
+    monkeypatch.setattr(integration, "database_versions", _REAL_DATABASE_VERSIONS)
+    monkeypatch.setattr(integration, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(integration, "create_db_engine", lambda settings: object())
+    monkeypatch.setattr(integration, "get_schema_version", lambda engine: applied)
+    assert integration.database_versions(object()) == (2, applied, state)
 
-    fake = types.ModuleType("spakr.db")
-    fake.SCHEMA_VERSION = 3
-    fake.create_db_engine = lambda settings: object()
-    fake.get_schema_version = lambda engine: 2
-    monkeypatch.setitem(sys.modules, "spakr.db", fake)
-    response = create_app(config={}).test_client().get("/api/v1/health")
+
+def test_database_versions_unreachable(monkeypatch):
+    def boom(settings):
+        raise OSError("down")
+
+    monkeypatch.setattr(integration, "database_versions", _REAL_DATABASE_VERSIONS)
+    monkeypatch.setattr(integration, "create_db_engine", boom)
+    _, current, state = integration.database_versions(object())
+    assert (current, state) == (None, "unavailable")
+
+
+def test_health_not_ok_when_database_needs_upgrade(client, monkeypatch):
+    monkeypatch.setattr(integration, "database_versions", lambda c: (3, 2, "needs-upgrade"))
+    response = client.get("/api/v1/health")
     assert response.status_code == 503
-    body = response.get_json()
-    assert body["status"] == "degraded"
-    assert body["database_version"] == {"expected": 3, "current": 2, "state": "outdated"}
+    assert response.get_json()["status"] == "degraded"

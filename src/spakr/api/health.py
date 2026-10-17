@@ -12,7 +12,7 @@ from spakr.version import software_version
 class DatabaseVersion(BaseModel):
     expected: int | None
     current: int | None
-    state: str  # ok | outdated | unavailable | unknown
+    state: str  # ok | needs-upgrade | newer-than-code | uninitialised | unavailable | unknown
 
 
 class Health(BaseModel):
@@ -23,14 +23,6 @@ class Health(BaseModel):
     database_version: DatabaseVersion
 
 
-def database_state(expected: int | None, current: int | None) -> str:
-    if expected is None:
-        return "unknown"
-    if current is None:
-        return "unavailable"
-    return "ok" if current == expected else "outdated"
-
-
 def make_blueprint(spec) -> Blueprint:
     bp = Blueprint("health", __name__)
 
@@ -39,13 +31,12 @@ def make_blueprint(spec) -> Blueprint:
     def health():
         state = current_app.extensions["spakr"]
         configured = state.config is not None
-        expected, current = (
-            integration.database_versions(state.config) if configured else (None, None)
+        expected, current, db_state = (
+            integration.database_versions(state.config) if configured else (None, None, "unknown")
         )
-        db_state = database_state(expected, current) if configured else "unknown"
         if not configured:
             status = "not_configured"
-        elif db_state in ("outdated", "unavailable"):
+        elif db_state != "ok":
             status = "degraded"
         else:
             status = "ok"
