@@ -24,3 +24,15 @@ Code: MIT ([`LICENSE`](LICENSE)). Game content: CC BY-SA 4.0 ([`CONTENT-LICENSE.
 
 ## Plan
 Start at [`docs/plan/index.html`](docs/plan/index.html). Once GitHub Pages is enabled (Settings, Pages, deploy from branch, folder `/docs`) it is served at `/plan/`.
+
+## Development
+
+Requires **Python 3.12** or newer.
+
+```sh
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -e '.[dev]'
+python -m pytest
+```
+
+Copy `examples/config.json.example` to `config.json` (mode 0600) and fill in the database section. All runtime data lives under `/data` (git-ignored; set `SPAKR_DATA_DIR` or `paths.data_dir` to move it, for example in tests). `python -m spakr check-config` validates the file.

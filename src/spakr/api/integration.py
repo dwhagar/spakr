@@ -1,45 +1,23 @@
 """The API's only touch points with the configuration and database layers.
 
 spakr.config and spakr.db belong to the database and settings work. Until
-they exist this module falls back to a minimal JSON loader and "unknown"
-database versions, so the API runs and reports `unknown` instead of failing.
+spakr.db exists, database versions are reported as `unknown` instead of failing.
 """
 
-import json
 import logging
 from typing import Any
 
-from spakr import paths
+from spakr.config import ConfigError, Settings, load_settings
 
 log = logging.getLogger("spakr.api")
 
 
-def load_config() -> tuple[Any | None, str | None]:
-    """Return (config, None) or (None, reason). Never raises, never a traceback."""
+def load_config() -> tuple[Settings | None, str | None]:
+    """Return (settings, None) or (None, reason). Never raises, never a traceback."""
     try:
-        from spakr import config as config_module
-    except ImportError:
-        return _fallback_load()
-    try:
-        return config_module.load_config(), None
-    except config_module.ConfigError as error:
+        return load_settings(), None
+    except ConfigError as error:
         return None, str(error)
-
-
-def _fallback_load() -> tuple[Any | None, str | None]:
-    path = paths.config_path()
-    if not path.is_file():
-        return None, (
-            f"Configuration file {path} not found. Copy examples/config.json.example "
-            "there and edit it."
-        )
-    try:
-        data = json.loads(path.read_text())
-    except (OSError, ValueError) as error:
-        return None, f"Configuration file {path} cannot be read: {error}"
-    if not isinstance(data, dict):
-        return None, f"Configuration file {path} must contain a JSON object."
-    return data, None
 
 
 def database_versions(config: Any) -> tuple[int | None, int | None]:

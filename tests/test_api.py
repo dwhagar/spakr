@@ -10,6 +10,16 @@ from spakr import outbound
 from spakr.api import API_VERSION, create_app
 from spakr.version import software_version
 
+VALID_CONFIG = {
+    "database": {"name": "t", "user": "u", "password": "pw"},
+    "secrets": {"secret_key": "k" * 40},
+}
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_config(monkeypatch):
+    monkeypatch.delenv("SPAKR_CONFIG", raising=False)
+
 
 @pytest.fixture
 def client():
@@ -51,13 +61,17 @@ def test_config_fixed_without_restart(monkeypatch, tmp_path):
     monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
     client = create_app().test_client()
     assert client.get("/api/v1/health").status_code == 503
-    (tmp_path / "config.json").write_text('{"site": {}}')
+    good = tmp_path / "config.json"
+    good.write_text(json.dumps(VALID_CONFIG))
+    good.chmod(0o600)
     assert client.get("/api/v1/health").status_code == 200
 
 
 def test_invalid_config_is_reported_not_raised(monkeypatch, tmp_path):
     monkeypatch.setenv("SPAKR_DATA_DIR", str(tmp_path))
-    (tmp_path / "config.json").write_text("{not json")
+    bad = tmp_path / "config.json"
+    bad.write_text("{not json")
+    bad.chmod(0o600)
     response = create_app().test_client().get("/api/v1/health")
     assert response.get_json()["status"] == "not_configured"
 
