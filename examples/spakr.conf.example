@@ -1,0 +1,46 @@
+# Draft Apache virtual host for spakr. Copy to /etc/apache2/sites-available/spakr.conf and adjust.
+<VirtualHost *:80>
+    ServerName spakr.example.org
+    Redirect permanent / https://spakr.example.org/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName spakr.example.org
+    DocumentRoot /srv/spakr/src/html/static
+
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/spakr.example.org/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/spakr.example.org/privkey.pem
+
+    # Main application (WSGI, daemon mode)
+    WSGIDaemonProcess spakr user=spakr group=spakr processes=2 threads=8 \
+        python-home=/srv/spakr/venv python-path=/srv/spakr/src
+    WSGIProcessGroup spakr
+    WSGIScriptAlias / /srv/spakr/src/html/wsgi.py
+
+    <Directory /srv/spakr/src/html>
+        Require all granted
+    </Directory>
+
+    # Small standalone CGI scripts
+    ScriptAlias /cgi-bin/ /srv/spakr/src/html/cgi-bin/
+    <Directory /srv/spakr/src/html/cgi-bin>
+        Options +ExecCGI
+        Require all granted
+    </Directory>
+
+    # Never serve configuration, content repo or uploads directly
+    <DirectoryMatch "/\.git">
+        Require all denied
+    </DirectoryMatch>
+    <FilesMatch "\.json$">
+        Require all denied
+    </FilesMatch>
+
+    LimitRequestBody 10485760
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'"
+
+    ErrorLog  ${APACHE_LOG_DIR}/spakr-error.log
+    CustomLog ${APACHE_LOG_DIR}/spakr-access.log combined
+</VirtualHost>

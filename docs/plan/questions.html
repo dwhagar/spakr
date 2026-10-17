@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open questions and defaults chosen - spakr plan</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<h1>Open questions and defaults chosen</h1>
+
+<p>Where the brief left a choice open, a default was picked so planning could continue. Please confirm or change.</p>
+<div class="q"><h2>Defaults chosen</h2>
+<table><tr><th>Topic</th><th>Default</th></tr>
+<tr><td>Framework</td><td>Plain WSGI with a thin router and Jinja2 templates; no large framework</td></tr>
+<tr><td>Queue library</td><td>RQ on Redis</td></tr>
+<tr><td>Content storage</td><td>Markdown in git is the source of truth; MySQL is a rebuildable index plus accounts</td></tr>
+<tr><td>Math</td><td>Server-side rendering to static markup; no client script</td></tr>
+<tr><td>Reading</td><td>Anonymous readers allowed; editing needs an account</td></tr>
+<tr><td>Registration</td><td>Admin creates accounts or approves sign-ups</td></tr>
+<tr><td>Default HTML allowlist</td><td>Empty until the admin approves tags; suggested first approvals: sup, sub, u, abbr</td></tr>
+<tr><td>Default upload types</td><td>PNG, JPEG, GIF, WebP, TXT, MD, CSV; SVG and PDF off</td></tr>
+<tr><td>Upload size limit</td><td>10 MB, admin adjustable</td></tr>
+<tr><td>Python</td><td>Distribution Python 3 on each LTS</td></tr>
+</table></div>
+<h2>Questions</h2>
+<ol>
+<li>Is this single-tenant (one game world per install) or should it host several games/campaigns?</li>
+<li>Do you want per-page visibility (for example GM-only secrets) in 1.0, or is everything visible to all readers?</li>
+<li>Should game-system rules (stat blocks, dice) be structured fields in 1.0, or stay free text?</li>
+<li>Is "CGI support" meant for the whole app, or only for a few small scripts (our assumption)?</li>
+<li>Is Ubuntu 26 LTS a hard target for 1.0 or best effort until it is released and tested?</li>
+<li>Preferred licence for content versus code (the repository already carries a licence file)?</li>
+<li>Do you want GitHub Pages enabled from <code>/docs</code> on <code>main</code>?</li>
+</ol>
+
+</main></body></html>

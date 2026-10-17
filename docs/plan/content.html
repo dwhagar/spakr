@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content, rendering and security - spakr plan</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><a href="index.html">Plan</a><a href="tiers.html">Tiers</a><a href="architecture.html">Architecture</a><a href="data-model.html">Data model</a><a href="content.html">Content &amp; security</a><a href="deployment.html">Deployment</a><a href="questions.html">Open questions</a></nav><main>
+<h1>Content, rendering and security</h1>
+
+<h2>Allowed content</h2>
+<ul>
+<li>Markdown (MultiMarkdown flavour) and LaTeX math only.</li>
+<li>Raw HTML is stripped by default. The admin keeps an <strong>allowlist</strong> of simple HTML 1.0/1.1-era tags that Markdown lacks, for example <code>&lt;sup&gt;</code>, <code>&lt;sub&gt;</code>, <code>&lt;u&gt;</code>, <code>&lt;abbr&gt;</code>. Tags are added only by manual admin approval.</li>
+<li>Allowed tags carry no attributes unless the admin approves specific ones; <code>style</code>, <code>on*</code>, <code>class</code> and <code>id</code> are never allowable. <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;iframe&gt;</code>, <code>&lt;object&gt;</code> and <code>javascript:</code> URLs are never allowable.</li>
+</ul>
+<h2>Rendering pipeline</h2>
+<ol>
+<li>Load Markdown from git at the requested commit (default: head).</li>
+<li>Extract math spans so they are not mangled by Markdown.</li>
+<li>Render with MultiMarkdown (tables, footnotes, citations, definition lists, metadata).</li>
+<li>Sanitise the HTML against the allowlist (parse, drop anything not approved, never regex).</li>
+<li>Typeset math: default is server-side to static markup (no client script). Client-side MathJax/KaTeX from our own static files is an option if the CSP allows it.</li>
+<li>Cache the result keyed by commit hash; the worker invalidates on change.</li>
+</ol>
+<p>The site sends a strict <code>Content-Security-Policy</code> with no inline script or style, as a second line of defence.</p>
+<h2>Revisioning</h2>
+<ul>
+<li>One git repository for content, separate from the code repository. Path: <code>&lt;type&gt;/&lt;slug&gt;.md</code>.</li>
+<li>Each edit is a commit with the user as author and an optional edit summary.</li>
+<li>History, diff and revert are available in the UI. Revert creates a new commit; history is never rewritten.</li>
+<li>Renames keep history by using <code>git mv</code>; slugs redirect.</li>
+</ul>
+<h2>Uploads</h2>
+<ul>
+<li><strong>Safe by default</strong>: images (PNG, JPEG, GIF, WebP), plain text, Markdown, CSV. SVG is excluded by default because it can carry script.</li>
+<li>Admin toggles can enable additional classes such as PDF, audio, video, archives.</li>
+<li><strong>Admin override</strong>: a file outside the enabled list lands in quarantine and is only published after an admin approves it individually.</li>
+<li>Checks: extension and sniffed MIME must agree, size limit, files renamed to their content hash, stored outside the web root and served by the app with <code>X-Content-Type-Options: nosniff</code> and <code>Content-Disposition</code> set appropriately, optional ClamAV scan in the worker.</li>
+</ul>
+<h2>Other security basics</h2>
+<p>Password hashing with argon2 or bcrypt, CSRF tokens, secure and HttpOnly cookies, parameterised SQL only, rate limiting on login, audit log of admin actions.</p>
+
+</main></body></html>
