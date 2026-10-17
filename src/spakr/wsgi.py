@@ -7,7 +7,7 @@
     WSGIScriptAlias / /srv/spakr/src/spakr/wsgi.py
 
 The application object never fails to import: a missing or invalid
-/data/config.json is logged and reported by /api/v1/health as not_configured.
+config.json is logged and reported by /api/v1/health as not_configured.
 """
 
 from spakr.api import create_app
