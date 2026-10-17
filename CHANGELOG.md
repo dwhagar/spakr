@@ -5,6 +5,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 ## [Unreleased]
 
 ### Added
+- Health and status (API.8): `/api/v1/health` reads the real database schema version through `spakr.db` and reports `ok`, `needs-upgrade`, `newer-than-code`, `uninitialised` or `unavailable`; anything but `ok` makes the overall status `degraded` (HTTP 503). The duplicate `spakr/db/versions.py` shim is removed.
 - Content-side research (RES.1, RES.2, RES.3, RES.4, RES.7, RES.8, RES.10, RES.11 done; new RES.25 caching done) as pages under `docs/research` with a research index, backed by experiments on Ubuntu 24.04: Markdown engines compared, MathML maths with Temml, the nh3 sanitiser against 23 hostile inputs, git access benchmarks and a locking test, MySQL FULLTEXT trials up to 50,000 pages, ImageMagick policy and ffmpeg checks, a strict-CSP browser test and cache timings. Prototype scripts in `docs/research/poc/`; tested ImageMagick policy in `examples/imagemagick-policy.xml`.
 - New item RND.7 (link-status pass after the render cache).
 

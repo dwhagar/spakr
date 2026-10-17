@@ -59,7 +59,7 @@ Issue: [#11](https://github.com/dwhagar/spakr/issues/11)
 - [ ] **API.5** Generic CRUD helpers for page-backed resources [0.5] — needs: API.4, ENT.1, GIT.2
 - [ ] **API.6** Request security context: trust HTTPS and client address from Apache (X-Forwarded-Proto) only from a configured trusted proxy; Secure and __Host- cookies; HSTS only when the admin enables it (TLS and certificates are Apache's job) [0.4] — needs: API.1, CFG.4, RND.4
 - [x] **API.7** Integer API version: counts up with every API change, sent in a response header and kept in one place in the code [0.1] — needs: API.1
-- [ ] **API.8** Health and status endpoint reports the API version, the database schema version, the software version (MAJOR.MINOR.BUILD) and the configuration state [0.1] — needs: API.1, API.7, DB.5, REL.5
+- [x] **API.8** Health and status endpoint reports the API version, the database schema version, the software version (MAJOR.MINOR.BUILD) and the configuration state [0.1] — needs: API.1, API.7, DB.5, REL.5
 
 ## DB: Database
 
