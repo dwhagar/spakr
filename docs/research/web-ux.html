@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calm responsive UX - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="web-layer.html">Web layer</a><a href="web-devices.html">Devices and TV</a><a href="web-components.html">UI components</a><a href="web-ux.html">Calm UX</a><a href="web-prototype/index.html">Prototype</a><a href="accessibility.html">Accessibility</a></nav><main>
+
+<h1>RES.32: Calm, responsive UX (Mastodon and Wiki.js style)</h1>
+<p><em>Research thread "Research: calm responsive UX", 2026-10-21. Builds on the web layer research (<a href="web-layer.html">RES.11, 21, 22, 24</a>, <a href="web-devices.html">RES.23</a>, <a href="web-components.html">components</a>) and <a href="accessibility.html">RES.18</a>; it does not repeat them. Owner brief: modern, calm, simple like Mastodon and Wiki.js, built mobile-first from the ground up, open source icon packs, an interface that gets out of the way.</em></p>
+
+<h2>Recommendation</h2>
+<p>The earlier research already chose the right engine for a calm UI: server-rendered pages, hand-written modern CSS with tokens, no-build ES modules, strict CSP, system fonts, a Lucide sprite. <strong>Keep all of it.</strong> What was missing was the design rules that make it feel calm, and a few decisions the shell plan (UX.1 to UX.28) needs. This page adds:</p>
+<ol>
+<li><strong>Ten calm rules</strong> (below) written as testable statements, so "gets out of the way" is something a review can check.</li>
+<li><strong>One content column, two optional rails.</strong> Reading width is capped (about 70ch), the left drawer and right rail appear only when there is room, and nothing else competes for attention. This is the Mastodon single-column and Wikipedia Vector 2022 pattern, and it matches the already planned shell.</li>
+<li><strong>Per-setting themes change colour and heading character only</strong>, never layout. Three settings times light and dark gives six generated, contrast-checked palettes (UX.29).</li>
+<li><strong>Icons: stay with Lucide</strong> (ISC, with an MIT part). Licence details and the runners-up are below; THIRD-PARTY.md must carry both Lucide notices.</li>
+<li><strong>Progressive enhancement is a rule per component</strong>: each interactive part has a working no-JavaScript form (UX.30).</li>
+<li><strong>The editor stays a textarea</strong>, but typed fields live in a real form above the body and the toolbar is built for phone keyboards (UI.24).</li>
+<li><strong>No JavaScript framework, no CSS framework.</strong> The case for Preact stays "reserved, decide when UI.4 or UI.7 hurt".</li>
+</ol>
+
+<h2>Where this agrees or disagrees with earlier research</h2>
+<table>
+<tr><th>Earlier finding</th><th>Status</th></tr>
+<tr><td>No Node, hand-written CSS, no-build modules, strict CSP (RES.11, 21, 22)</td><td>Agrees. Nothing here needs a build step.</td></tr>
+<tr><td>One layout breakpoint at 62rem, everything else fluid (RES.23)</td><td>Agrees for content. UX.8 adds a three-column layout on very wide screens; implement it with a container query or one second min-width rule (about 90rem), not a device class. Flagged so the "only one breakpoint" line is read as "only one for content".</td></tr>
+<tr><td>Navigation: "plain wrapping list, no hamburger" (RES.23)</td><td>Already superseded by the owner's shell decision (UX.1). This research agrees with the hamburger and left drawer, and adds the no-JS fallback (UX.30).</td></tr>
+<tr><td>System font stack, Atkinson Hyperlegible Next as an optional setting (RES.24)</td><td>Agrees. Adds that a setting may also pick a heading font (see Typography) from a short, self-hosted, OFL list.</td></tr>
+<tr><td>Icons: Lucide subset as an SVG sprite, Tabler as runner-up</td><td>Agrees. Corrects one detail: Lucide is ISC <em>plus</em> MIT for the Feather-derived icons, so two notices are needed (checked below).</td></tr>
+<tr><td>Textarea editor with toolbar and server preview</td><td>Agrees. Adds mobile keyboard handling and a typed-fields form (UI.24).</td></tr>
+<tr><td>Avoid <code>@layer</code>, nesting, <code>light-dark()</code>, <code>:has()</code> for anything essential (RES.23)</td><td>Agrees. The rules below respect it; new CSS features are polish only.</td></tr>
+</table>
+<p>Nothing in this research contradicts Research C.</p>
+
+<h2>What the reference apps do, and what to copy</h2>
+<p>Facts about Mastodon come from its release notes and the search results listed under Sources. Facts about Wiki.js and Wikipedia are from my own knowledge and were not re-checked here (a search for Wiki.js returned nothing usable), so treat them as impressions.</p>
+<table>
+<tr><th>App</th><th>Pattern</th><th>Take</th><th>Leave</th></tr>
+<tr><td>Mastodon web</td><td>On phones and narrow windows a single column; since 2.9 the timelines are tabs inside it. An optional "advanced" multi-column mode needs room for at least two columns of roughly 340 px, otherwise it falls back to one column. Sparse chrome, one accent colour, content first.</td><td>Single column by default; extra columns only when they fit; tabs rather than more screens; one accent colour; generous touch targets.</td><td>Fixed-width columns (they break on odd widths); the advanced mode itself, which our pages do not need.</td></tr>
+<tr><td>Wiki.js</td><td>Top header with search, a collapsible left navigation tree, a right-hand table of contents, a narrow centred article, page actions as a small toolbar. Material-style Vue front end.</td><td>The shell layout (this is UX.1), search always at hand, page TOC on the right.</td><td>A Vue/Vuetify client: heavy, inline styles, incompatible with our CSP and no-Node rule.</td></tr>
+<tr><td>Wikipedia (Vector 2022)</td><td>Sticky header that shrinks on scroll, a limited-width toggle, the page TOC kept in view beside the article, collapsible sidebars, section collapsing on mobile.</td><td>Collapsed sections for long pages on phones (<code>&lt;details&gt;</code>), TOC that follows you.</td><td>Dense sidebars of links.</td></tr>
+</table>
+
+<h2>Ten calm rules</h2>
+<p>These become part of the UI acceptance checklist (UI.13). Each is checkable in the Playwright screenshot run (UX.12) or a code review.</p>
+<ol>
+<li><strong>Content first.</strong> On a phone the first screen after the top bar shows the page title and the start of the text. Rails, tools and metadata are one tap away, never above the text.</li>
+<li><strong>One accent colour per setting</strong>, used for links, the current item and primary buttons only. Everything else is neutral. Status uses text and an icon as well as colour.</li>
+<li><strong>One primary action per screen</strong> (Save, Edit, Search). Secondary actions are plain buttons or links; destructive ones are never the default.</li>
+<li><strong>Quiet motion.</strong> Transitions of 120 to 200 ms for the drawer and disclosure, nothing that moves on its own, all of it off under <code>prefers-reduced-motion</code>.</li>
+<li><strong>No surprise layers.</strong> No pop-ups, auto-playing media, carousels, cookie banners (only functional cookies are set) or infinite scroll. Lists use pagination so the back button and keyboard work.</li>
+<li><strong>Messages stay put.</strong> Success is a short polite status line; errors stay on screen next to the field and in a summary until fixed. No toasts that vanish.</li>
+<li><strong>Whitespace is a feature.</strong> Spacing comes from the fluid space token; one reading width; borders are hairlines or none; elevation only on overlays (drawer, dialog, combobox list).</li>
+<li><strong>Label first, icon second.</strong> Navigation and primary buttons carry text. Icon-only buttons (hamburger, theme, close) have an accessible name and a visible focus ring, and are 44 px on touch.</li>
+<li><strong>Same place every time.</strong> The shell never rearranges between pages; page actions sit in the same spot for every entity type (WCAG 3.2.3, 3.2.6).</li>
+<li><strong>Fast by default.</strong> A reading page needs no script to be complete and stays inside the budgets below.</li>
+</ol>
+
+<h2>Layout, navigation and search</h2>
+<ul>
+<li><strong>Shell.</strong> Keep the planned top bar, left drawer (site contents), right rail (page TOC, actions, related). Use named CSS grid areas so the same markup becomes one, two or three columns. Under 62rem the rail collapses to a <code>&lt;details&gt;</code> block under the title; the drawer is an overlay.</li>
+<li><strong>Phone navigation.</strong> The top-bar hamburger decided in UX.1 is enough for a reading-first site. A bottom tab bar (the Mastodon app's choice) helps feed-style apps where you switch views often; a wiki is read far more than navigated, and a bottom bar costs screen height and clashes with the editor keyboard. Not recommended; offered as an owner decision (see Questions).</li>
+<li><strong>Drawer content.</strong> Sections by entity type, then setting, plus the admin-editable links (UX.16). Collapsible groups are <code>&lt;details&gt;</code> with the group containing the current page open. Show at most two levels; deeper browsing is the Browse page.</li>
+<li><strong>Search.</strong> Always in the top bar on wide screens, one icon on narrow ones that opens the field full width (UX.23). Results group by entity type, show the setting as a text badge, a short snippet with the match, and the type icon. Arrow keys and Enter work in the combobox; a plain results page is the no-JS path (already planned in UI.19). Empty state offers "create this page" to editors. Pressing <code>/</code> to focus search is convenient but is a single-key shortcut (WCAG 2.1.4): ship it only with an off switch in user settings, default off.</li>
+<li><strong>Links between entries.</strong> Inline entity links get the type icon in front of the name; missing pages show a dashed underline and the word "(missing)" for assistive tech, not red alone. Hover previews (as Wikipedia has) are not needed and are bad on touch; skip for 1.0.</li>
+<li><strong>Breadcrumbs</strong> above the title (UX.17); the page TOC follows the reader with scroll-spy (UX.13). Use <code>scroll-padding-top</code> equal to the sticky bar so focused and anchored items are never hidden (WCAG 2.4.11).</li>
+<li><strong>Infobox ("facts").</strong> For a game database the stat block is the most-read element. Render it as a definition list: in the right rail on wide screens, at the top of the article under the title on phones, collapsed after the first rows if long. The container query already prototyped (label/value side by side only when wide enough) is the right tool.</li>
+</ul>
+
+<h2>Design tokens and per-setting themes</h2>
+<p>Tokens already exist (UI.12, UX.2). Structure them in three layers, each in its own CSS file or block, so a theme change never touches components:</p>
+<table>
+<tr><th>Layer</th><th>Contains</th><th>Changes by</th></tr>
+<tr><td>Primitive</td><td>Neutral ramp, space and type scales, radii, shell sizes.</td><td>Almost never</td></tr>
+<tr><td>Semantic</td><td><code>--surface</code>, <code>--text</code>, <code>--text-muted</code>, <code>--border</code>, <code>--accent</code>, <code>--accent-text</code>, <code>--focus</code>, status colours. Defined for light and dark.</td><td>Colour scheme (user) and setting (page)</td></tr>
+<tr><td>Component</td><td>Optional local tokens such as <code>--card-bg: var(--surface-raised)</code>.</td><td>Component authors</td></tr>
+</table>
+<p><strong>Setting themes.</strong> The page's setting sets <code>data-setting="fantasy|horror|scifi"</code> on <code>&lt;body&gt;</code> (server-rendered, no script). Only the accent, a surface tint, the heading font and the type-icon accent change. Layout, spacing and component shapes are identical in all three, so there is one UI to test and maintain. Suggested starting accents (to be tuned by eye): fantasy a warm amber or forest green, horror a muted teal or oxblood on a cooler grey, scifi a cyan or indigo. Pages with no setting (home, tools, settings) use a neutral accent.</p>
+<p><strong>Keeping contrast guaranteed.</strong> Do not hand-pick 24 colours. Extend the existing Python tool: give it a hue per setting and it writes the accent steps at fixed lightness and saturation for light and dark, then runs the existing WCAG pair check on all six palettes. Emit plain hex (not <code>oklch()</code>, which older TV engines lack). The generated file is committed, so there is no build step at install time. Accent text on the surface needs 4.5:1; the focus ring 3:1 against both.</p>
+<p>Colour scheme (light, dark, auto) is the user's choice and independent of the setting, stored server-side as already planned (UX.9). Always set <code>color-scheme</code>; support <code>forced-colors</code> and <code>prefers-contrast: more</code> by falling back to system colours for borders and focus.</p>
+
+<h2>Typography</h2>
+<ul>
+<li><strong>Body:</strong> system UI stack (<code>system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif</code>), fluid size and 70ch measure as already prototyped, line height 1.6 for prose and 1.4 for UI, <code>font-variant-numeric: tabular-nums</code> in stat blocks and tables. System fonts cost zero bytes and never flash.</li>
+<li><strong>Optional character:</strong> a setting may name a heading font from a short list of self-hosted OFL fonts, subsetted to Latin, WOFF2, <code>font-display: swap</code>, preloaded only for headings, at most two files per setting. The reading text stays on the system stack so a font failure never hurts legibility. Atkinson Hyperlegible Next (OFL 1.1, variable weights 200 to 800, reserved font names "Atkinson" and "Hyperlegible") stays the offered accessibility option for body text. Heading font suggestions are not fixed here: this needs a look at real candidates and the owner's taste. The licence needs a line in THIRD-PARTY.md (OFL requires the notice to travel with the font).</li>
+<li><strong>Scale:</strong> 1.2 ratio steps from the existing <code>--step-*</code> tokens; do not add more than six sizes. Headings use <code>text-wrap: balance</code> where supported.</li>
+<li><strong>No fake bold or letter-spaced uppercase labels</strong> as the main way to create hierarchy; use size, weight and space.</li>
+</ul>
+
+<h2>Open source icon packs and licences</h2>
+<p>Licences below were read from each project's LICENSE file on 2026-10-21. The code is MIT and the content CC BY-SA; icons are part of the interface, not the content, so the content licence does not apply to them, but each icon licence must be compatible with shipping inside an MIT project and its notice must be kept (THIRD-PARTY.md, UI.17).</p>
+<table>
+<tr><th>Pack</th><th>Licence (read from the file)</th><th>Style</th><th>Verdict</th></tr>
+<tr><td><strong>Lucide</strong></td><td>ISC (Lucide contributors, 2026), plus MIT (Cole Bemis, 2013 to present) for icons derived from Feather</td><td>Outline, 24 px grid, 2 px stroke, around 1,500 icons</td><td><strong>Use.</strong> Calm, consistent, easy to recolour with <code>currentColor</code>. Two notices go into THIRD-PARTY.md. Already used in the prototype sprite.</td></tr>
+<tr><td>Tabler Icons</td><td>MIT (Paweł Kuna, 2020 to 2026)</td><td>Outline, around 5,000 icons</td><td>Runner-up: larger set if a Lucide icon is missing. A mix of two packs looks uneven, so only fill gaps by redrawing in the same style.</td></tr>
+<tr><td>Phosphor</td><td>MIT (Phosphor Icons, 2023)</td><td>Six weights (thin to bold, fill, duotone)</td><td>Interesting for per-setting weight (thin for scifi, bold for fantasy), but it multiplies the sprite and the review work. Not recommended for 1.0.</td></tr>
+<tr><td>Heroicons</td><td>MIT (Tailwind Labs)</td><td>Outline and solid, under 300 icons</td><td>Too few icons for entity types.</td></tr>
+<tr><td>Material Symbols / Material Design Icons</td><td>Apache 2.0</td><td>Large, variable axes</td><td>Compatible (Apache 2.0 needs the licence text and a NOTICE), but the look is more app-like and the variable font is heavy. Not needed.</td></tr>
+<tr><td>Font Awesome Free</td><td>Icons CC BY 4.0, fonts OFL 1.1, code MIT; brand icons are excluded and trademarked</td><td>Solid, familiar</td><td>Usable with attribution, but the licence mix and the Pro upsell are extra care for no gain. Skip.</td></tr>
+<tr><td>game-icons.net</td><td><em>Not verified here.</em> From memory CC BY 3.0 with per-artist credits</td><td>Thousands of RPG glyphs (swords, potions, creatures)</td><td>Possibly useful later for item and creature art because Lucide has few RPG shapes. Per-icon attribution adds work and needs its licence read before any use. Not for 1.0.</td></tr>
+</table>
+<p><strong>Delivery.</strong> One SVG sprite built by <code>make-icons.py</code> from the icons actually used, referenced with <code>&lt;svg&gt;&lt;use href="/static/icons.svg#name"&gt;</code> (same origin, so the strict CSP is fine). Decorative icons get <code>aria-hidden="true"</code>; icon-only buttons get a text name. Sizes 20 px in text and 24 px in buttons, stroke from <code>currentColor</code> so dark mode and settings need no extra icon files. Entity-type icons (character, item, technology, place, magic, psionics, ability, skill, entity, race, nation-state, page) are a fixed mapping kept in one table (UX.32) so adding a type means adding one line.</p>
+
+<h2>CSS approach and keeping it maintainable</h2>
+<ul>
+<li><strong>Files:</strong> <code>tokens.css</code> (primitive, semantic, setting overrides), <code>base.css</code> (reset, typography, forms), <code>layout.css</code> (shell grid), <code>components/*.css</code> (one file per component: drawer, rail, card, infobox, table-wrap, combobox, dialog, editor). Served as separate files over HTTP/2 or concatenated by <code>hash-assets.py</code> (a plain join, still no processing).</li>
+<li><strong>Naming:</strong> mostly element selectors for prose and forms, plus short component classes (<code>.drawer</code>, <code>.card</code>, <code>.infobox</code>) with state in attributes (<code>[aria-expanded="true"]</code>, <code>[aria-current="page"]</code>) so state styling and accessibility cannot drift apart. Specificity stays at one class; no <code>!important</code>, no IDs for styling. Add a small lint check in the daily run that fails on <code>!important</code>, <code>style=</code> attributes and unknown <code>var(--)</code> names.</li>
+<li><strong>Logical properties</strong> (<code>margin-inline</code>, <code>padding-block</code>) throughout, so a right-to-left language later costs nothing.</li>
+<li><strong>Style guide page</strong> (UX.31) rendered by the real templates showing every component in all states, in each setting, light and dark. It is both the developer reference and the page the screenshot tests use, so a visual change is reviewed in one place.</li>
+<li><strong>Budgets</strong> (proposal, checked by UI.17): reading page CSS 20 KB gzipped, JavaScript 8 KB gzipped, editor page JavaScript 20 KB, no web fonts blocking first paint, all images with width and height. The prototype is 4 KB of CSS and 2 KB of JavaScript, so there is room.</li>
+</ul>
+
+<h2>Progressive enhancement, component by component</h2>
+<table>
+<tr><th>Component</th><th>Works with no JavaScript by</th><th>JavaScript adds</th></tr>
+<tr><td>Drawer</td><td>Hamburger is a link to <code>#site-nav</code>; CSS <code>:target</code> shows the drawer on narrow screens, a "Close" link returns to the page. Wide screens show it always.</td><td>Button with <code>aria-expanded</code>, focus trap, Escape, outside click, focus return</td></tr>
+<tr><td>Page TOC / rail</td><td>Plain list in a <code>&lt;details&gt;</code> on narrow screens</td><td>Scroll-spy marking</td></tr>
+<tr><td>Search</td><td>GET form to a results page</td><td>Combobox suggestions</td></tr>
+<tr><td>Theme and TV toggles</td><td>Form posts to a settings endpoint; server writes <code>data-theme</code> and <code>data-ui</code></td><td>Instant switch without reload</td></tr>
+<tr><td>Editor</td><td>Textarea and a Save button; Preview is a form submit</td><td>Toolbar, side-by-side live preview, draft restore</td></tr>
+<tr><td>Tables, images</td><td>Scroll wrapper; image links to the file</td><td>Dialog lightbox</td></tr>
+</table>
+<p>Optional polish that costs nothing when unsupported: cross-document view transitions (<code>@view-transition { navigation: auto; }</code>) give a soft fade between pages without a single-page app; they are Chromium-only from my knowledge (not tested here), must be disabled under reduced motion, and are ignored by TV engines. The Speculation Rules prefetch hint is a script block and would need a CSP hash; not adopted.</p>
+
+<h2>Editing experience</h2>
+<ul>
+<li><strong>Typed fields are a form, not YAML.</strong> For a game database most of an entry is structured (stats, race, setting, relations). The editor shows a generated form for the entity's fields (RES.13 defines them), then the Markdown body textarea below. Front matter is serialised by the server; editors never see it. This is the biggest usability win for non-technical game masters.</li>
+<li><strong>Phones.</strong> Add <code>interactive-widget=resizes-content</code> to the viewport meta so the on-screen keyboard shrinks the layout instead of covering the field (Chromium 108 and later, from my knowledge; test on a real device). The toolbar is a horizontally scrolling row of 44 px buttons kept above the keyboard; Write/Preview are tabs (already prototyped).</li>
+<li><strong>Safety net.</strong> Draft in <code>localStorage</code> with a "restore draft" line, a leave-page warning only when there are unsaved changes, and the base-revision conflict shown as a normal error summary (GIT.7).</li>
+<li><strong>Shortcuts.</strong> Ctrl/Cmd+B, I, K and Ctrl+Enter to save are modifier shortcuts, allowed under WCAG 2.1.4. A short collapsible Markdown cheat sheet sits next to the toolbar.</li>
+<li><strong>Link and media picker</strong> reuses the search combobox (UI.19). Insert produces Markdown the editor can still read and change.</li>
+<li><strong>Not worth doing for 1.0:</strong> WYSIWYG, slash menus, drag-and-drop block editing, collaborative editing.</li>
+</ul>
+
+<h2>Performance</h2>
+<ul>
+<li>Server rendering and the content-keyed render cache (RES.25) make the HTML cheap; send <code>ETag</code> and let Apache compress (brotli if the module is present, otherwise gzip).</li>
+<li>Hashed static files with <code>immutable</code> caching (hash-assets), page HTML revalidated.</li>
+<li><code>width</code> and <code>height</code> on every image, <code>loading="lazy"</code> below the fold, <code>fetchpriority="high"</code> on the first large image only; thumbnails from the media series via <code>srcset</code>.</li>
+<li>Add to UX.12 a throttled-network load per key page (Playwright with Chrome DevTools network and CPU throttling) recording largest contentful paint and layout shift against a budget. This works without Node, in the same Python Playwright setup.</li>
+</ul>
+
+<h2>Anti-patterns to refuse</h2>
+<p>A CSS or JS framework; icon fonts (they fail silently and cannot be recoloured per rule); inline <code>style=</code> or event attributes (CSP); modal dialogs for ordinary flows; hover-only features; infinite scroll; autoplaying anything; fixed pixel font sizes; colour-only meaning; hiding content from keyboard users behind gestures (swipe-to-open drawers are an optional extra, never the only way).</p>
+
+<h2>Questions for the owner</h2>
+<ol>
+<li><strong>How far should per-setting themes go?</strong> Recommended: accent colour, surface tint and heading font only. Alternative: accent only (simplest), or a fuller restyle (more testing, risks an uneven product).</li>
+<li><strong>Phone navigation:</strong> keep the top-bar hamburger and drawer (recommended), or add a bottom tab bar on phones (Home, Search, Browse, Menu)?</li>
+</ol>
+<p>Defaults above are used until answered; both are cheap to change because they live in tokens and the shell template.</p>
+
+<h2>What could not be verified</h2>
+<p>No real devices, no Safari or Firefox, no screen reader; the interactive-widget viewport value, view transitions and the single-key shortcut guidance are from my own knowledge and not tested; Wiki.js and Wikipedia layout notes are impressions; game-icons.net licence not read; heading font candidates not chosen or measured.</p>
+
+<h2>Sources</h2>
+<ul>
+<li><a href="https://blog.joinmastodon.org/2019/06/mastodon-2.9">Mastodon 2.9 release notes</a> (single-column layout with timelines as tabs)</li>
+<li><a href="https://technicallyskeptical.substack.com/p/mastodon-advanced-menu-options-from-someone-who-didnt-create-it-ef45b0ca5a33">Mastodon advanced menu options</a> (multi-column needs two columns of about 340 px)</li>
+<li>Licence files read 2026-10-21: <a href="https://github.com/lucide-icons/lucide/blob/main/LICENSE">Lucide</a>, <a href="https://github.com/tabler/tabler-icons/blob/main/LICENSE">Tabler</a>, <a href="https://github.com/phosphor-icons/core/blob/main/LICENSE">Phosphor</a>, <a href="https://github.com/tailwindlabs/heroicons/blob/master/LICENSE">Heroicons</a>, <a href="https://github.com/FortAwesome/Font-Awesome/blob/6.x/LICENSE.txt">Font Awesome Free</a>, <a href="https://github.com/google/material-design-icons/blob/master/LICENSE">Material Design Icons</a></li>
+<li>Atkinson Hyperlegible Next: SIL OFL 1.1 as reported by search results (e.g. the Debian new-queue review page); file sizes not measured.</li>
+</ul>
+</main></body></html>
