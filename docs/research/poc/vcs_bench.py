@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RES.33 benchmark: git vs Mercurial vs Fossil vs Subversion as a page store.
+"""RES.34 benchmark: git vs Mercurial vs Fossil vs Subversion as a page store.
 Usage: vcs_bench.py WORKDIR   (needs git, hg, fossil, svn, svnmucc on PATH)
 """
 import os, random, shutil, subprocess as sp, sys, time, threading, statistics as st

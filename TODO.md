@@ -33,6 +33,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 - [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
+- [x] **DOC.9** Component checklist (docs/plan/components.html) first pass done and kept in step with TODO.md: every component mapped to items, gaps flagged; to be aligned with the component research catalogue [0.0]
 - [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
 ## FND: Foundation
@@ -96,6 +97,7 @@ Issue: [#14](https://github.com/dwhagar/spakr/issues/14)
 - [ ] **GIT.6** Slug rules, rename and move [0.2] — needs: GIT.2
 - [ ] **GIT.7** Edit conflict detection based on the base commit [0.2] — needs: GIT.2
 - [ ] **GIT.9** Complete front matter: the page file carries everything about a page that is not derived (typed fields, tags, settings, visibility, aliases, relations), so the MySQL index can be rebuilt from git alone; page.content_sha256 records the file hash for INT.4 (RES.29) [0.2] — needs: GIT.2, RES.13, RES.29
+- [ ] **GIT.10** Delete and restore a page: deletion is a commit, deleted pages disappear from lists, search and links, moderators can restore, admins can purge permanently [0.2] — needs: GIT.2, GIT.5
 
 ## RND: Rendering and sanitising
 
@@ -114,7 +116,7 @@ Issue: [#15](https://github.com/dwhagar/spakr/issues/15)
 Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 
 - [ ] **AUTH.1** Users and password hashing [0.4] — needs: DB.2, RES.5
-- [ ] **AUTH.2** Login, logout, cookie sessions and CSRF header [0.4] — needs: AUTH.1, API.1, API.6
+- [ ] **AUTH.2** Login, logout, cookie sessions and CSRF header; login throttling (SEC.10) ships in the same phase [0.4] — needs: AUTH.1, API.1, API.6
 - [ ] **AUTH.3** Roles and permissions: reader, editor, GM, mod, admin [0.4] — needs: AUTH.1, DB.2
 - [ ] **AUTH.4** Invitation flow (7-day tokens) [0.4] — needs: AUTH.1, MAIL.2
 - [ ] **AUTH.5** Password reset flow (1-hour tokens) [0.4] — needs: AUTH.1, MAIL.2
@@ -159,6 +161,9 @@ Issue: [#19](https://github.com/dwhagar/spakr/issues/19)
 - [ ] **ENT.11** Free pages [0.5] — needs: ENT.1
 - [ ] **ENT.12** Settings as tags (high fantasy, modern/cosmic horror, scifi) [0.5] — needs: ENT.1
 - [ ] **ENT.13** Per-type form schemas served by the API for the UI to render [0.5] — needs: ENT.1, API.5
+- [ ] **ENT.14** Infobox: the typed fields of a page render as a labelled box beside the page text (stacked above it on narrow screens), formatted per field type; the page text stays separate from the fields [0.5] — needs: ENT.1, GIT.9, RND.1
+- [ ] **ENT.15** Infobox lead image: an image field refers to a media id with alt text and a placeholder when missing, respecting media visibility and takedown [0.7] — needs: ENT.14, MED.7, MED.11
+- [ ] **ENT.16** Static pages (WordPress-style): home, about, rules and privacy as editable free pages with an optional place in the site menu, reserved slugs and edit rights by role [0.6] — needs: ENT.11, UX.16
 
 ## LNK: Links, relations and browsing
 
@@ -294,6 +299,41 @@ Owner decision: a top bar with tab navigation for account, tools and settings an
 - [ ] **UX.34** Search results presentation: grouped by type, setting badge, snippet, empty state with create-page for editors [0.8] — needs: UX.23, UI.6
 - [ ] **UX.35** Throttled-load check per key page (Playwright CPU and network throttling): largest contentful paint and layout shift against the page budgets, in the daily run [0.1] — needs: UX.12, UI.17
 
+## SEC: Security components
+
+Issue: [#60](https://github.com/dwhagar/spakr/issues/60)
+
+Principle (owner decision): security is king; where security and efficiency conflict, security wins. These items add what the other categories do not already cover; the full component checklist is docs/plan/components.html.
+
+- [ ] **SEC.1** Threat model and security requirements in docs/design/security.html: assets, actors (anonymous, reader, editor, GM, mod, admin, API client), trust boundaries (Apache, WSGI, MySQL, Redis, git, ffmpeg and ImageMagick), abuse cases (stored XSS, path traversal, SSRF, upload bombs, IDOR on GM-only content, credential stuffing, CSRF, session theft, secret leakage) and the item that answers each [0.1] — needs: RES.5, RES.9, RES.12
+- [ ] **SEC.2** Input handling rules: schema validation of every API input, parameterised queries only, slug and path normalisation with traversal tests, request size and field length caps, one place that encodes output [0.1] — needs: API.1, SEC.1
+- [ ] **SEC.3** Outbound controls: the shared HTTP helper is the only way to make outbound requests, destinations come from settings only, no feature fetches user-supplied URLs, private address ranges refused; the API is same-origin only with no CORS, written into the API design [0.1] — needs: FND.4, SEC.1
+- [ ] **SEC.4** Dependency and supply-chain security: pinned requirements with hashes, pip-audit in the daily run, update policy, THIRD-PARTY.md and an SBOM at release [0.1] — needs: FND.1, FND.7
+- [ ] **SEC.5** Static analysis and secret scanning in the daily run: Ruff security rules (S) or bandit, a secrets scanner, a check that config.json and /data are never tracked [0.1] — needs: FND.7
+- [ ] **SEC.6** Service hardening: systemd sandbox options for the web and worker units (no new privileges, private tmp, read-only system, memory limits), Apache hardening (no server tokens, no TRACE, no listings, deny .git, /data and backups), dedicated unprivileged user, optional AppArmor profile [0.1] — needs: FND.6, SEC.1
+- [ ] **SEC.7** Database least privilege: separate MySQL users for the application (data changes only), migrations (schema changes) and backups (read only), no root use, the audit table insert and select only for the runtime user, TLS when the database is not local [0.1] — needs: DB.2, CFG.3
+- [ ] **SEC.8** Redis hardening: unix socket or localhost only, password, no secrets in queued jobs [0.1] — needs: QUE.1
+- [ ] **SEC.9** Vulnerability disclosure: SECURITY.md and /.well-known/security.txt with the contact address [0.1] — needs: SEC.1
+- [ ] **SEC.10** Login throttling and credential-stuffing defence: per account and per address limits with increasing delay, uniform responses so accounts cannot be enumerated, applied before the general rate limiter (OPS.2) arrives [0.4] — needs: AUTH.2, SEC.1
+- [ ] **SEC.11** Session management: rotation at login, idle and absolute timeouts, list of active sessions with revoke and sign out everywhere, admin force-logout, all sessions revoked on password change [0.4] — needs: AUTH.2, AUTH.10
+- [ ] **SEC.12** Two-factor sign-in with one-time codes (TOTP) and recovery codes, optional for users and requirable by the admin for moderators and admins [0.4] — needs: AUTH.2, AUTH.10, SEC.11
+- [ ] **SEC.13** Route and permission matrix test: generated from the route table, every route against every role and API key scope; fails when a route has no permission decorator [0.4] — needs: API.4, AUTH.3, TST.2
+- [ ] **SEC.14** Security event logging: failed logins, permission denials, role and key changes, settings changes and takedowns go to the audit log and a log with a no-secrets filter; a line format fail2ban can read; admin notice for repeated failures [0.4] — needs: AUTH.7, FND.8, MAIL.1
+- [ ] **SEC.15** Request limits against denial of service: body and header size, timeouts, pagination caps, cost caps on search and preview, per-user concurrency on expensive endpoints [0.4] — needs: API.2, SEC.2
+- [ ] **SEC.16** User suspension: suspend, reactivate or ban an account (sessions and keys revoked), edit-rate limits for new accounts [0.4] — needs: AUTH.3, GIT.4
+- [ ] **SEC.17** Personal data lifecycle: inventory of what is stored about a person (email, address in logs, audit), log retention, account deletion that anonymises while keeping contributions, a written policy on personal data in git history (commit author names and addresses), covered by the user data export (AUTH.12) [0.4] — needs: AUTH.10, AUTH.12
+- [ ] **SEC.18** Content security tests: fuzz the Markdown, sanitiser and maths pipeline with hostile input, an XSS corpus, and a ZAP baseline scan against a test instance in the daily run [0.3] — needs: RND.3, RND.2, FND.7
+- [ ] **SEC.19** Sandboxed media tools: ffmpeg and ImageMagick run as the unprivileged worker with systemd sandboxing (no network, private tmp, memory and CPU limits, system call filter) and a hard timeout [0.7] — needs: MED.4, MED.5, QUE.2, SEC.6
+- [ ] **SEC.20** Incident runbook: rotate every secret, revoke all sessions and API keys, restore from backup, check integrity, with exact commands [0.9] — needs: INT.13, BAK.12, SEC.11
+- [ ] **SEC.21** Security acceptance: the security review (OPS.1) checks every abuse case in SEC.1 against its test and signs off the component checklist [0.9] — needs: OPS.1, SEC.13, SEC.18
+- [ ] **SEC.22** Email change confirmation: the new address is confirmed by a token before it replaces the old one, and the old address is told [0.4] — needs: AUTH.10, MAIL.2
+- [ ] **SEC.23** Host header allow-list: requests for other host names are refused [0.4] — needs: API.6, CFG.4
+- [ ] **SEC.24** Rotation of the session signing key without signing everyone out at once [0.4] — needs: AUTH.2, SEC.11
+- [ ] **SEC.25** Moderator tools: hide a page, suspend a user, bulk-revert one user's edits, all audited [0.6] — needs: AUTH.3, GIT.4, SEC.16, VIS.2
+- [ ] **SEC.26** Page protection: a protected page can be changed only by editors, mods or admins at the chosen level [0.6] — needs: AUTH.3, GIT.2
+- [ ] **SEC.27** SSRF and CORS tests: no endpoint fetches a user-supplied URL, cross-origin requests are refused [0.4] — needs: SEC.3, API.4
+- [ ] **SEC.28** Public health endpoint reveals only up or down; versions, schema and backup detail need an admin session or a local address [0.4] — needs: API.8, API.4, AUTH.3
+
 ## OPS: Hardening and operations
 
 Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
@@ -305,6 +345,9 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.5** Backup acceptance on a clean install: the latest nightly backup, with parity, restores into a fresh server and matches the original (delivered by the BAK category) [0.9] — needs: BAK.12, BAK.13, BAK.14, BAK.26
 - [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
+- [ ] **OPS.8** `spakr upgrade` and maintenance mode: takes a verified backup, runs migrations, verifies, reports how to roll back; a maintenance page while it runs [0.8] — needs: BAK.11, DB.2, FND.9
+- [ ] **OPS.9** Log rotation example and monitoring notes (health endpoint, backup age, integrity state, queue length) in examples/ and the admin guide [0.2] — needs: FND.8, FND.6
+- [ ] **OPS.10** General alerts beyond backups through the mail relay: failed jobs, low disk space, stuck queue, integrity problems [0.8] — needs: MAIL.1, BAK.19, INT.12
 
 ## RES: Research and decisions (phase 0.0)
 
@@ -342,7 +385,8 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.30** Backup design: consistent snapshot of MySQL (mysqldump single-transaction), the git store and media without stopping the site; archive layout and naming; tar.bz2 versus tar.gz speed and size (and parallel bzip2); whether media is full nightly or incremental; par2cmdline on Ubuntu 24.04 and its redundancy defaults; retention scheme; restore order (builds on RES.17 and RES.29) [0.0] — needs: RES.17, RES.29
 - [x] **RES.31** Secrets and privacy in backups (decided): back up a redacted config.json with secrets removed, secrets are re-entered on restore, and archives for the optional off-host copy may be encrypted (age or gpg); the database dump and archives are protected by 0700/0600 permissions [0.0]
 - [x] **RES.32** Calm responsive UX: reference apps, ten calm rules, per-setting themes, icon pack licences, no-JS fallbacks, editing UX, budgets (docs/research/web-ux.html) [0.0]
-- [x] **RES.33** Which version control system for page content: git versus Mercurial, Fossil, Subversion, Jujutsu, Pijul, Dolt; measured saves, concurrency, history, blame and size; git confirmed, Subversion the only close rival (docs/research/vcs-choice.html) [0.0]
+- [x] **RES.33** Required system components: how to describe them (C4 containers plus a ranked catalogue with ASVS as a completeness check), 68 components ranked S1 to S4 for security with efficiency notes, status against this TODO list and the gaps found (docs/research/components.html) [0.0]
+- [x] **RES.34** Which version control system for page content: git versus Mercurial, Fossil, Subversion, Jujutsu, Pijul, Dolt; measured saves, concurrency, history, blame and size; git confirmed, Subversion the only close rival (docs/research/vcs-choice.html) [0.0]
 
 ## TST: Testing and sample content
 
