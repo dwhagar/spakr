@@ -250,6 +250,7 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.21** Media detail screen: metadata editor, usage list, variants view and regeneration, replace and rename, visibility, takedown [0.8] — needs: UI.20, MED.12, MED.15, MED.16, MED.21
 - [ ] **UI.22** Media moderation queue and bulk-action screens [0.8] — needs: UI.20, MED.17, MED.19
 - [ ] **UI.23** Admin media screens: storage statistics and quota, duplicates report, prune settings, trigger and status of prune runs [0.8] — needs: UI.20, MED.18, MED.20, MED.28
+- [ ] **UI.24** Editor ergonomics: typed-field form generated from the entity schema above the Markdown textarea, front matter written by the server, phone toolbar above the keyboard (interactive-widget=resizes-content), draft restore, unsaved-changes guard, Markdown cheat sheet (RES.32) [0.8] — needs: UI.4, RES.13
 
 ## UX: Application shell and navigation
 
@@ -285,6 +286,13 @@ Owner decision: a top bar with tab navigation for account, tools and settings an
 - [ ] **UX.26** Logo setting and upload flow in the admin settings: choose the logo through the normal upload interface, alt text, preview of the derived icons, replace and remove [0.8] — needs: UX.25, CFG.7, UI.8, MED.30
 - [ ] **UX.27** Head tags and web manifest generated from settings: icon links, apple-touch-icon, theme colour, Open Graph image fallback and manifest.webmanifest with the site name and derived icons [0.8] — needs: UX.26, MED.31, UI.18
 - [ ] **UX.28** Logo and icon tests: derived sizes, never enlarged, minimum-size rejection, SVG policy, wordmark fallback, regeneration on change, cache headers, alt text [0.8] — needs: UX.27, MED.30
+- [ ] **UX.29** Setting themes: data-setting on the page, per-setting accent, surface tint and heading font as token overrides; make-palettes tool generates the six palettes (three settings, light and dark) from a hue and the contrast check covers all of them (RES.32) [0.1] — needs: UX.2, UI.17, RES.32
+- [ ] **UX.30** No-JavaScript fallbacks for the shell: drawer by :target link, rail and TOC in details, theme toggle by form post; JavaScript only upgrades them (RES.32) [0.1] — needs: UX.5, UX.6, UX.9
+- [ ] **UX.31** Style guide page rendered from the real templates: every component in all states, each setting, light and dark; used by the screenshot tests [0.1] — needs: UX.2, UX.12
+- [ ] **UX.32** Entity-type icon table: one mapping from type to Lucide icon in the sprite, inline entity link chip with icon, THIRD-PARTY.md carrying both Lucide notices [0.6] — needs: UI.17, LNK.4
+- [ ] **UX.33** Typography tokens and optional self-hosted OFL fonts: heading font per setting and Atkinson Hyperlegible Next as a reading option, subset WOFF2, licence notices [0.2] — needs: UX.2, UX.29
+- [ ] **UX.34** Search results presentation: grouped by type, setting badge, snippet, empty state with create-page for editors [0.8] — needs: UX.23, UI.6
+- [ ] **UX.35** Throttled-load check per key page (Playwright CPU and network throttling): largest contentful paint and layout shift against the page budgets, in the daily run [0.1] — needs: UX.12, UI.17
 
 ## OPS: Hardening and operations
 
@@ -333,6 +341,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [x] **RES.29** MySQL or git for page content: measured saves, concurrency, history, growth, backups and corruption trials; git stays the source of truth (docs/research/content-store-choice.html) [0.0]
 - [ ] **RES.30** Backup design: consistent snapshot of MySQL (mysqldump single-transaction), the git store and media without stopping the site; archive layout and naming; tar.bz2 versus tar.gz speed and size (and parallel bzip2); whether media is full nightly or incremental; par2cmdline on Ubuntu 24.04 and its redundancy defaults; retention scheme; restore order (builds on RES.17 and RES.29) [0.0] — needs: RES.17, RES.29
 - [x] **RES.31** Secrets and privacy in backups (decided): back up a redacted config.json with secrets removed, secrets are re-entered on restore, and archives for the optional off-host copy may be encrypted (age or gpg); the database dump and archives are protected by 0700/0600 permissions [0.0]
+- [x] **RES.32** Calm responsive UX: reference apps, ten calm rules, per-setting themes, icon pack licences, no-JS fallbacks, editing UX, budgets (docs/research/web-ux.html) [0.0]
 
 ## TST: Testing and sample content
 
