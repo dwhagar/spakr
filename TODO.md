@@ -342,6 +342,7 @@ Issue: [#27](https://github.com/dwhagar/spakr/issues/27)
 - [ ] **RES.30** Backup design: consistent snapshot of MySQL (mysqldump single-transaction), the git store and media without stopping the site; archive layout and naming; tar.bz2 versus tar.gz speed and size (and parallel bzip2); whether media is full nightly or incremental; par2cmdline on Ubuntu 24.04 and its redundancy defaults; retention scheme; restore order (builds on RES.17 and RES.29) [0.0] — needs: RES.17, RES.29
 - [x] **RES.31** Secrets and privacy in backups (decided): back up a redacted config.json with secrets removed, secrets are re-entered on restore, and archives for the optional off-host copy may be encrypted (age or gpg); the database dump and archives are protected by 0700/0600 permissions [0.0]
 - [x] **RES.32** Calm responsive UX: reference apps, ten calm rules, per-setting themes, icon pack licences, no-JS fallbacks, editing UX, budgets (docs/research/web-ux.html) [0.0]
+- [x] **RES.33** Required system components: how to describe them (C4 containers plus a ranked catalogue with ASVS as a completeness check), 68 components ranked S1 to S4 for security with efficiency notes, status against this TODO list and the gaps found (docs/research/components.html) [0.0]
 
 ## TST: Testing and sample content
 
