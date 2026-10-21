@@ -142,12 +142,12 @@
 <h2>Anti-patterns to refuse</h2>
 <p>A CSS or JS framework; icon fonts (they fail silently and cannot be recoloured per rule); inline <code>style=</code> or event attributes (CSP); modal dialogs for ordinary flows; hover-only features; infinite scroll; autoplaying anything; fixed pixel font sizes; colour-only meaning; hiding content from keyboard users behind gestures (swipe-to-open drawers are an optional extra, never the only way).</p>
 
-<h2>Questions for the owner</h2>
+<h2>Decisions by the owner (2026-10-21)</h2>
 <ol>
 <li><strong>How far should per-setting themes go?</strong> Recommended: accent colour, surface tint and heading font only. Alternative: accent only (simplest), or a fuller restyle (more testing, risks an uneven product).</li>
 <li><strong>Phone navigation:</strong> keep the top-bar hamburger and drawer (recommended), or add a bottom tab bar on phones (Home, Search, Browse, Menu)?</li>
 </ol>
-<p>Defaults above are used until answered; both are cheap to change because they live in tokens and the shell template.</p>
+<p>Both recommendations were accepted: setting themes change accent, surface tint and heading font only, and phones keep the top bar and drawer with no bottom tab bar.</p>
 
 <h2>What could not be verified</h2>
 <p>No real devices, no Safari or Firefox, no screen reader; the interactive-widget viewport value, view transitions and the single-key shortcut guidance are from my own knowledge and not tested; Wiki.js and Wikipedia layout notes are impressions; game-icons.net licence not read; heading font candidates not chosen or measured.</p>
