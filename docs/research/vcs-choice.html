@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES.33 Which version control system for content - spakr research</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Research index</a><a href="git-content-store.html">Git store</a><a href="content-store-choice.html">MySQL or git</a></nav><main>
+<h1>RES.33: Git or another version control system for page content</h1>
+<p><em>Research thread, 2026-10-21. Question from the owner: which versioning system would be best for this purpose, comparing git with other similar version control systems? Measured on Ubuntu 24.04.5 (4 cores) with git 2.43.0, Mercurial 6.7.2, Fossil (Ubuntu package), Subversion 1.14.3. Script: <code>poc/vcs_bench.py</code>. Builds on <a href="git-content-store.html">RES.4</a> and <a href="content-store-choice.html">RES.29</a>. Storing history in MySQL instead was settled in RES.29 and is not revisited here.</em></p>
+
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Keep git. This confirms the current decision (RES.4 and RES.29); nothing in GIT.1 to GIT.9 changes.</strong> No other system beats it on the things this site needs, and several lose on something that matters (packaging, licence, Python access, or a missing concurrency story).</li>
+<li><strong>The closest rival is Subversion, and it is worth saying why it is not chosen.</strong> A central server fits a web app well: <code>svnmucc</code> commits a file straight into the repository with no working copy and no lock, 8 writers ran at 120 to 140 saves a second with 0 failures, and a stale edit is rejected by the server as "out of date", which is exactly the edit-conflict rule the site needs. It loses on the things git gives for free: a clone or <code>git bundle</code> is a complete, verifiable, portable backup (RES.17, RES.29), <code>git fsck</code> and immutable packs make parity files simple (RES.29), rename-following history and a built-in three-way merge of text, and a plain folder of Markdown files that anyone can read without the app. Its speed edge is not needed: git's serialised 8 to 30 saves a second is far above what a game wiki needs.</li>
+<li><strong>Not chosen, and why in one line each:</strong> Mercurial (good model, but its Python API is explicitly unstable and GPL, and the command line is slow here), Fossil (superb for a self-contained project site, but one SQLite file and one checkout per writer, no useful library access), Jujutsu (still pre-1.0, no stable API, stores in git anyway), Pijul (pre-1.0, no Ubuntu package), Dolt (replaces MySQL and diffs table cells, not prose).</li>
+<li><strong>Keep the <code>GitStore</code> wrapper from RES.4.</strong> The interface is small (read, write with base check, history, diff, revert, rename), so a different backend could be swapped in later. Jujutsu is the one to watch (see below).</li>
+</ul>
+
+<h2>What the site needs from a version control system</h2>
+<p>Pages are small Markdown files with front matter, edited by a handful of people through a web app. The system is called by Python under Apache mod_wsgi and by a queue worker, on one host, backed up by a script, run by one admin. So the criteria are: safe programmatic use from Python; concurrent writers to different pages without failures; a clean conflict signal for the same page; fast history, diff and blame for one file; per-user attribution; revert; plain-text diff of prose; low disk growth; backups and integrity checks (RES.29); packaged for Ubuntu 24.04 with a licence that fits an MIT project; and operational simplicity.</p>
+
+<h2>Measurements</h2>
+<p>2,000 Markdown files of about 2.5 KB in 50 folders, then edits of single pages and eleven rounds of small edits to 40 pages. Median of 15 runs, in milliseconds, command-line tools called from Python as the app would. Two repeat runs agreed within a few percent. Absolute times are higher than in RES.4 because the git save here is <code>git add</code> plus <code>git commit -- path</code> (two processes) on a busy sandbox; compare the columns, not the figures with RES.4.</p>
+<table><tr><th>Measure</th><th>Git</th><th>Mercurial</th><th>Fossil</th><th>Subversion</th></tr>
+<tr><td>One save, one writer (ms)</td><td>110</td><td>235</td><td>300</td><td><strong>16 to 19</strong> (<code>svnmucc</code>, no working copy)</td></tr>
+<tr><td>8 writers, different pages (saves/s, failures out of 80)</td><td>7.5 to 9 with a lock, 0 failed; <strong>without the lock 71 to 78 of 80 failed</strong></td><td>6 to 7, 0 failed (it locks itself)</td><td>60 to 79 but <strong>79 of 80 failed</strong> in one shared checkout</td><td><strong>120 to 140, 0 failed</strong></td></tr>
+<tr><td>History of one file (ms)</td><td>13 to 14</td><td>240</td><td><strong>6</strong></td><td>10</td></tr>
+<tr><td>Diff of one file across 3 revisions (ms)</td><td><strong>3</strong></td><td>230</td><td>5.5</td><td>9</td></tr>
+<tr><td>Blame (ms)</td><td><strong>4</strong></td><td>205 to 218</td><td>6.5</td><td>10</td></tr>
+<tr><td>Read an old revision (ms)</td><td><strong>3</strong></td><td>225</td><td>8</td><td>9</td></tr>
+<tr><td>Repository size after the edits</td><td><strong>3.4 MB</strong> (after <code>git gc</code>)</td><td>9.5 MB</td><td>6.0 MB (after rebuild --compress)</td><td>6.4 MB</td></tr>
+</table>
+<p>Reading the table. Git is fast at everything except the write, and the write is only slow when writers must wait for each other, which the lock from RES.4 handles. Mercurial's 200 ms per call is Python start-up (the Ubuntu package targets Python 3.12 and needed a wrapper on this machine, which also defaults to 3.13): using it in-process would be quicker but its in-process API is documented as unstable. Fossil's failures are not a bug in Fossil: all writers shared one checkout and Fossil refuses a commit when the checkout changed underneath it, so a web app would need one checkout per writer. Fossil also decides which files changed by modification time, and the benchmark failed until <code>--hash</code> was added, because two edits within one second looked unchanged. Subversion is fastest on writes because the server does the work.</p>
+
+<h2>The systems compared</h2>
+<table><tr><th>System</th><th>Licence and Ubuntu 24.04</th><th>Use from Python</th><th>Concurrent editing and conflicts</th><th>Verdict</th></tr>
+<tr><td><strong>Git</strong> (chosen)</td><td>GPL-2.0, separate process; 2.43.0 in the archive</td><td>Call the binary (RES.4); pygit2 as a later option for fast reads</td><td>One writer at a time under a lock; per-page base-commit check; merge and rebase exist if ever needed</td><td>Best all round. SHA-1 objects (hardened); content-addressed, immutable packs, bundles, fsck, widest tooling</td></tr>
+<tr><td><strong>Subversion</strong></td><td>Apache-2.0; 1.14.3 in the archive</td><td>Command line; <code>svnmucc</code> for server-side commits. Python bindings exist but are awkward</td><td>Best: the server serialises, a stale base is rejected, no lock. Per-path revisions, linear revision numbers</td><td>Runner-up. Loses on backup/portability, integrity tooling, rename history and ecosystem; central-only</td></tr>
+<tr><td><strong>Mercurial</strong></td><td>GPL-2.0-or-later; 6.7.2 in the archive</td><td>Command line, or its Python API (not stable, GPL)</td><td>Internal locks; per-file history is slow through the CLI</td><td>Sound, but nothing it adds is needed and it is the slowest here</td></tr>
+<tr><td><strong>Fossil</strong></td><td>BSD-2-Clause; packaged</td><td>Command line only</td><td>SQLite locking; one checkout per writer; mtime-based change detection</td><td>Fast reads and a built-in wiki, but the wiki and web UI would duplicate the app. One file holds everything, so corruption or a lock affects all</td></tr>
+<tr><td><strong>Jujutsu</strong> (jj)</td><td>Apache-2.0; Rust; not in the Ubuntu 24.04 archive</td><td>Command line; no stable library</td><td>Automatic conflict recording is attractive, but the storage is a git repository</td><td>Not a different store, a different front end for git. Pre-1.0 (not verified for 2026). Revisit only if its conflict model is wanted</td></tr>
+<tr><td><strong>Pijul</strong></td><td>GPL-2.0; Rust; not in the archive</td><td>Command line</td><td>Patch theory gives good merges</td><td>Pre-1.0 and a small community. Too risky for the only copy of the content</td></tr>
+<tr><td><strong>Dolt</strong></td><td>Apache-2.0; Go; not in the archive</td><td>It is a MySQL-compatible server</td><td>Branches, merges and diffs at row and cell level</td><td>Would replace MySQL, and a Markdown page is one cell, so a diff is the whole value. Solves a different problem</td></tr>
+<tr><td>Others</td><td>Darcs (Haskell), Sapling (Meta, GPL), Bazaar/Breezy (dormant), Perforce (proprietary)</td><td>-</td><td>-</td><td>None is packaged for Ubuntu 24.04 with a reason to prefer it</td></tr>
+</table>
+<p>Jujutsu, Pijul and Dolt rows are desk research from documentation and general knowledge, not measured here (I did not benchmark them); the web searches done for this note confirmed only Dolt's Apache-2.0 licence and its 2.x releases. Everything in the measurement table was run.</p>
+
+<h2>Diffing Markdown</h2>
+<p>Every system here diffs by line, and a paragraph is one line, so a small edit shows as a whole changed paragraph. This is the same for all of them and so does not decide anything. Git gets <code>--word-diff</code> for free (<code>git diff --word-diff=porcelain</code>), which the history screen (UI.5) can use, and a blame at line level is already fast. Hard-wrapping the text would improve diffs in every system, but it makes the editor worse, so it is not recommended.</p>
+
+<h2>Other considerations</h2>
+<ul>
+<li><strong>Per-user attribution.</strong> All of them record an author per revision. Git's separate author and committer, and the pseudonymous per-account identity already planned, are enough.</li>
+<li><strong>GM-only pages.</strong> No version control system has page-level access control. The repository must never be exposed raw, whichever system is used (RES.29).</li>
+<li><strong>Hash algorithm.</strong> Git is SHA-1 (hardened against collision attacks) with SHA-256 repositories marked experimental. The app already stores its own SHA-256 per page file (GIT.9, INT.4), so this does not matter.</li>
+<li><strong>Single point of failure.</strong> Fossil keeps everything in one file and Subversion keeps a server-only repository, so a copy of a git repository (full history on every clone, bundle for backup) is a stronger recovery story for a single admin.</li>
+</ul>
+
+<h2>Secondary reading: the project's own source code</h2>
+<p>If the question was about the source control for spakr's own code: it is already on git and GitHub, and versions are numbered by <code>scripts/version.sh</code> (REL.1). No change is suggested.</p>
+
+<h2>What could not be verified</h2>
+<ul>
+<li>Jujutsu, Pijul and Dolt were not installed or measured; their rows are from documentation and may have changed.</li>
+<li>Mercurial's in-process API speed (the unstable API, GPL) was not measured.</li>
+<li>Scale beyond 2,000 files and roughly a dozen revisions per page, and behaviour on a network filesystem (all of these assume a local disk on one host).</li>
+<li>Subversion's Python bindings and a long-running <code>svnserve</code> or Apache mod_dav_svn deployment were not tried; only <code>file://</code> access.</li>
+</ul>
+
+<h2>What would change this recommendation</h2>
+<ul>
+<li>Sustained write rates above the lock's capacity (tens of saves a second) with no way to batch: then plumbing-level git (RES.4) first, Subversion-style central commits second.</li>
+<li>A need for GM-only pages that must also be hidden in history at the storage layer: this would favour a per-group repository, still git.</li>
+<li>Jujutsu reaching 1.0 with a stable library and a packaged release: it could replace the command-line calls behind <code>GitStore</code> without changing the repository format.</li>
+</ul>
+</main></body></html>
