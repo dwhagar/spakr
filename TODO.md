@@ -34,8 +34,8 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 - [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
 - [x] **DOC.9** Component checklist (docs/plan/components.html) first pass done and kept in step with TODO.md: every component mapped to items, gaps flagged; to be aligned with the component research catalogue [0.0]
-- [ ] **DOC.10** Content and data design specification in docs/design/content-model.html: entity field schemas and front matter (RES.13), page types, infobox, relations and tags, visibility, search fields, import and export formats (RES.19), written as a specification with owner question cards [0.0]
-- [ ] **DOC.11** Security, integrity and operations design specification in docs/design/security-and-recovery.html: threat model, accounts and permission matrix, sessions, parity, source of truth and checksums (RES.26 to RES.28), backup design (RES.30), written as a specification with owner question cards [0.0]
+- [ ] **DOC.10** Content model and exchange design specification in docs/design (thread "Design: content model and exchange"): entity field schemas and front matter (RES.13), page types, infobox, import and export formats (RES.19), with owner question cards [0.0]
+- [ ] **DOC.11** Data integrity and backup design specification in docs/design (thread "Design: data integrity and backup"): parity, source of truth and rebuildable data, checksums, backup design (RES.26 to RES.28, RES.30), with owner question cards [0.0]
 - [ ] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — needs: DOC.10, DOC.11
 - [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
