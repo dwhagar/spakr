@@ -27,13 +27,16 @@ Issue: [#8](https://github.com/dwhagar/spakr/issues/8)
 Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 
 - [x] **DOC.1** Plan rewritten as tiers 0.0 to 0.9 with TODO ids [0.0]
-- [ ] **DOC.2** Enable GitHub Pages from /docs (owner action in repository settings) [0.0]
+- [x] **DOC.2** Enable GitHub Pages from /docs (owner action in repository settings; done, site live at https://dwhagar.github.io/spakr/) [0.0]
 - [ ] **DOC.3** Admin install and upgrade guide [0.9] — needs: FND.6, DB.2, QUE.2, OPS.5, CFG.1, BAK.27
 - [ ] **DOC.4** Editor guide: writing pages, links, media syntax, visibility [0.9] — needs: UI.4, MED.7, LNK.1
 - [ ] **DOC.5** API reference generated from the OpenAPI description [0.9] — needs: API.3
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 - [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
 - [x] **DOC.9** Component checklist (docs/plan/components.html) first pass done and kept in step with TODO.md: every component mapped to items, gaps flagged; to be aligned with the component research catalogue [0.0]
+- [ ] **DOC.10** Content model and exchange design specification in docs/design (thread "Design: content model and exchange"): entity field schemas and front matter (RES.13), page types, infobox, import and export formats (RES.19), with owner question cards [0.0]
+- [ ] **DOC.11** Data integrity and backup design specification in docs/design (thread "Design: data integrity and backup"): parity, source of truth and rebuildable data, checksums, backup design (RES.26 to RES.28, RES.30), with owner question cards [0.0]
+- [ ] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — needs: DOC.10, DOC.11
 - [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
 ## FND: Foundation
