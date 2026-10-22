@@ -34,9 +34,9 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [x] **DOC.6** Plan pages responsive with light and dark mode (style.css) [0.0]
 - [ ] **DOC.7** Privacy page and notice (seeded text, admin-editable) linked from the footer [0.9] — needs: UI.9, AUTH.12
 - [x] **DOC.9** Component checklist (docs/plan/components.html) first pass done and kept in step with TODO.md: every component mapped to items, gaps flagged; to be aligned with the component research catalogue [0.0]
-- [ ] **DOC.10** Content model and exchange design specification in docs/design (thread "Design: content model and exchange"): entity field schemas and front matter (RES.13), page types, infobox, import and export formats (RES.19), with owner question cards [0.0]
-- [ ] **DOC.11** Data integrity and backup design specification in docs/design (thread "Design: data integrity and backup"): parity, source of truth and rebuildable data, checksums, backup design (RES.26 to RES.28, RES.30), with owner question cards [0.0]
-- [ ] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — needs: DOC.10, DOC.11
+- [x] **DOC.10** Content model and exchange design specification in docs/design (thread "Design: content model and exchange"): entity field schemas and front matter (RES.13), page types, infobox, import and export formats (RES.19), with owner question cards [0.0]
+- [x] **DOC.11** Data integrity and backup design specification in docs/design (thread "Design: data integrity and backup"): parity, source of truth and rebuildable data, checksums, backup design (RES.26 to RES.28, RES.30), with owner question cards [0.0]
+- [ ] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — progress: 7 decision cards posted 2026-10-22 (see docs/plan/questions.html); the rest take the design documents' recommendations unless Boss objects — needs: DOC.10, DOC.11
 - [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
 ## FND: Foundation
@@ -74,7 +74,7 @@ Issue: [#11](https://github.com/dwhagar/spakr/issues/11)
 Issue: [#12](https://github.com/dwhagar/spakr/issues/12)
 
 - [x] **DB.1** SQLAlchemy engine and session setup [0.1] — needs: FND.2
-- [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, type tables, page_search, media, html_allowlist, upload_policy
+- [ ] **DB.2** Alembic migrations creating the schema in docs/design/database.html [0.1] — needs: DB.1 — progress: proposed change, content-model design: one page_field table replaces the nine type tables, pending ENT.17; migrations 0001 (foundation, accounts, roles, settings, audit) and 0002 (content core, relations) are in; still to add: api_key, invitation, password_reset, session, email_outbox, page_search, media, html_allowlist, upload_policy
 - [ ] **DB.3** Command to rebuild all derived MySQL data (page index, search tables, relations) from the git content store; resumable, dry-run option [0.2] — needs: DB.2, GIT.5, SEARCH.2, INT.1, GIT.9
 - [ ] **DB.4** Database restore into an empty schema with a schema-version check and integrity verification, used by `spakr restore` (the nightly dump is BAK.5) [0.1] — needs: DB.2, BAK.5
 - [x] **DB.5** Integer database schema version: counts up with every schema change, stored in the database, bumped by each migration and checked at startup [0.1] — needs: DB.2
@@ -101,6 +101,7 @@ Issue: [#14](https://github.com/dwhagar/spakr/issues/14)
 - [ ] **GIT.7** Edit conflict detection based on the base commit [0.2] — needs: GIT.2
 - [ ] **GIT.9** Complete front matter: the page file carries everything about a page that is not derived (typed fields, tags, settings, visibility, aliases, relations), so the MySQL index can be rebuilt from git alone; page.content_sha256 records the file hash for INT.4 (RES.29) [0.2] — needs: GIT.2, RES.13, RES.29
 - [ ] **GIT.10** Delete and restore a page: deletion is a commit, deleted pages disappear from lists, search and links, moderators can restore, admins can purge permanently [0.2] — needs: GIT.2, GIT.5
+- [ ] **GIT.11** Commit identity: author and committer are the opaque user public id (u-xxxxxxxxxx, placeholder .invalid email), trailers for reverts, imports and renames; u-system for system actions [0.2] — needs: GIT.2, AUTH.13
 
 ## RND: Rendering and sanitising
 
@@ -130,6 +131,7 @@ Issue: [#16](https://github.com/dwhagar/spakr/issues/16)
 - [ ] **AUTH.10** Account editing API (profile, email, password, roles) [0.4] — needs: AUTH.2, AUTH.3
 - [ ] **AUTH.11** Bootstrap the first admin account from the command line [0.4] — needs: FND.9, AUTH.1, AUTH.3
 - [ ] **AUTH.12** User data export: profile, contributions and audit entries about the account as JSON [0.4] — needs: AUTH.3, AUTH.10
+- [ ] **AUTH.13** user.public_id: random permanent opaque id generated at account creation, never reused, kept after erasure [0.2] — needs: DB.2
 
 ## MAIL: Email
 
@@ -151,7 +153,7 @@ Issue: [#18](https://github.com/dwhagar/spakr/issues/18)
 
 Issue: [#19](https://github.com/dwhagar/spakr/issues/19)
 
-- [ ] **ENT.1** Entity type registry and structured field definitions [0.5] — needs: GIT.2, DB.2, RES.13
+- [ ] **ENT.1** Entity type registry and structured field definitions [0.5] — needs: GIT.2, DB.2, RES.13 — progress: registry is one YAML file per type, docs/design/content-model-and-exchange.html; owner card on fixed versus admin-defined fields
 - [ ] **ENT.2** Characters [0.5] — needs: ENT.1
 - [ ] **ENT.3** Items and technology [0.5] — needs: ENT.1
 - [ ] **ENT.4** Places [0.5] — needs: ENT.1
@@ -167,6 +169,9 @@ Issue: [#19](https://github.com/dwhagar/spakr/issues/19)
 - [ ] **ENT.14** Infobox: the typed fields of a page render as a labelled box beside the page text (stacked above it on narrow screens), formatted per field type; the page text stays separate from the fields [0.5] — needs: ENT.1, GIT.9, RND.1
 - [ ] **ENT.15** Infobox lead image: an image field refers to a media id with alt text and a placeholder when missing, respecting media visibility and takedown [0.7] — needs: ENT.14, MED.7, MED.11
 - [ ] **ENT.16** Static pages (WordPress-style): home, about, rules and privacy as editable free pages with an optional place in the site menu, reserved slugs and edit rights by role [0.6] — needs: ENT.11, UX.16
+- [ ] **ENT.17** Browse-with-filters benchmark of the page_field table at 20,000 pages, deciding whether the per-type tables stay out of the plan (fallback: type tables or generated columns) [0.5] — needs: ENT.1, DB.2
+- [ ] **ENT.18** Hardened front matter loader and writer: YAML 1.1 traps (no, 0750, dates), no anchors or tags, size and depth caps, duplicate keys rejected, fixed key order, round-trip tests [0.2] — needs: GIT.2
+- [ ] **ENT.19** Vocabulary tables and admin API (choice_set, choice_value) with seeds from the content-model design [0.5] — needs: DB.2, AUTH.8
 
 ## LNK: Links, relations and browsing
 
@@ -230,6 +235,7 @@ Issue: [#22](https://github.com/dwhagar/spakr/issues/22)
 - [ ] **MED.29** Media suite tests: prune never deletes referenced or history-held files, grace period, lock against concurrent upload, replace keeps embeds, visibility and takedown leak tests [0.7] — needs: MED.25, MED.15, MED.21, MED.14
 - [ ] **MED.30** Logo and site-icon derivation as a queue task: from the uploaded logo, ImageMagick writes the favicon (ico and png sizes), Apple touch icon, web app manifest icons including maskable, an Open Graph image fallback and, where practical, monochrome and dark variants; never enlarged, a minimum source size is required, SVG is accepted only if the SVG upload policy allows it with a raster fallback; stored in the hashed media layout and regenerated whenever the logo changes [0.7] — needs: MED.3, MED.4, QUE.2
 - [ ] **MED.31** Routes serving the derived site icons and manifest assets with cache headers (long-lived for hashed URLs, short for /favicon.ico) [0.7] — needs: MED.30
+- [ ] **MED.32** Media sidecar meta.json written atomically beside each original (original name, uploader, reviewer, state, variant hashes) so the media table can be rebuilt from /data/media alone [0.7] — needs: MED.3, INT.3
 
 ## UI: Web UI (first-party JavaScript client)
 
@@ -346,11 +352,18 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, UI.21, RES.18, UI.13
 - [ ] **OPS.5** Backup acceptance on a clean install: the latest nightly backup, with parity, restores into a fresh server and matches the original (delivered by the BAK category) [0.9] — needs: BAK.12, BAK.13, BAK.14, BAK.26
-- [ ] **OPS.6** Import and export [0.9] — needs: GIT.2, ENT.1, RES.19
+- [ ] **OPS.6** Native bundle export: zip of page files byte-identical to git, manifest, no history, visibility-aware, queue task and download [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
 - [ ] **OPS.8** `spakr upgrade` and maintenance mode: takes a verified backup, runs migrations, verifies, reports how to roll back; a maintenance page while it runs [0.8] — needs: BAK.11, DB.2, FND.9
 - [ ] **OPS.9** Log rotation example and monitoring notes (health endpoint, backup age, integrity state, queue length) in examples/ and the admin guide [0.2] — needs: FND.8, FND.6
 - [ ] **OPS.10** General alerts beyond backups through the mail relay: failed jobs, low disk space, stuck queue, integrity problems [0.8] — needs: MAIL.1, BAK.19, INT.12
+- [ ] **OPS.11** Native bundle import: dry-run report, safe-zip checks, batch commits that revert as one unit [0.9] — needs: OPS.6, ENT.18
+- [ ] **OPS.12** Single-page Markdown import and export [0.9] — needs: ENT.18, GIT.2
+- [ ] **OPS.13** CSV export and import of typed fields [0.9] — needs: ENT.1, OPS.11
+- [ ] **OPS.14** Markdown folder import with field mapping [0.9] — needs: OPS.11
+- [ ] **OPS.15** Import and export permissions, size limits, audit entries and the safe-zip test suite [0.9] — needs: OPS.11, AUTH.8
+- [ ] **OPS.16** Revert a whole import as one operation [0.9] — needs: OPS.11, GIT.4
+- [ ] **OPS.17** Packaging notes: par2 required, pbzip2 used if installed [0.9] — needs: BAK.8
 
 ## RES: Research and decisions (phase 0.0)
 
@@ -406,7 +419,7 @@ Issue: [#51](https://github.com/dwhagar/spakr/issues/51)
 
 Principle (owner decision): the system is built from the ground up with checksums and parity data so a damaged database or store can be detected and rebuilt. Every stored artifact has a checksum, every artifact is classed as source of truth or rebuildable (INT.1), and every class has a tested recovery path.
 
-- [ ] **INT.1** Integrity principle and data classification recorded in docs/design/integrity.html: source of truth versus rebuildable for every table and file, checksum rules, recovery path per class; DB, GIT and MED items conform to it [0.1] — needs: RES.26, RES.27, RES.28
+- [ ] **INT.1** Integrity principle and data classification recorded in docs/design/integrity.html: source of truth versus rebuildable for every table and file, checksum rules, recovery path per class; DB, GIT and MED items conform to it [0.1] — needs: RES.26, RES.27, RES.28 — progress: written as docs/design/integrity-backup.html, which stands in for integrity.html unless split; done when its owner cards are answered
 - [ ] **INT.2** Schema integrity rules: migration records carry a content hash and refuse to run on a mismatch, row checksums on source-of-truth tables, hash-chained audit log; added as a migration on top of DB.2 [0.1] — needs: DB.2, INT.1
 - [ ] **INT.3** Hash manifest library: compute and verify SHA-256 manifests per directory with atomic writes, used by every store [0.1] — needs: FND.11, INT.1
 - [ ] **INT.4** Content store checks: git fsck after maintenance and on schedule, ref and HEAD verification, page files compared with the MySQL index [0.2] — needs: GIT.1, INT.3
@@ -429,7 +442,7 @@ Issue: [#54](https://github.com/dwhagar/spakr/issues/54)
 
 Owner decision: nightly backups of all data stored in /data/backups, each with a parity file; tar.bz2 by default, gz as an option. Built on the INT category (checksums, manifests, parity) and ordered so the basics (settings, layout, manifest, DB dump, config policy, restore) land first.
 
-- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1
+- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1 — progress: written as docs/design/integrity-backup.html; done when owner cards Q1 to Q3 are answered
 - [ ] **BAK.2** Backup settings in config.json.example and the settings registry: enabled, directory (default /data/backups), format bz2 (default) or gz, parity redundancy percent, retention, off-host command, alert on failure, stale-after hours; validated [0.1] — needs: CFG.1, CFG.2, BAK.1
 - [ ] **BAK.3** Directory layout and permissions: /data/backups created at startup, directory 0700 and files 0600 owned by the dedicated user; refuses to run when the path is world-readable or under a web-served path [0.1] — needs: FND.11, BAK.1
 - [ ] **BAK.4** Backup manifest on the INT.3 helper: manifest.json per backup with name, time, software, API and schema versions, format, component list, SHA-256 and size per file, written atomically [0.1] — needs: INT.3, BAK.1
@@ -456,6 +469,7 @@ Owner decision: nightly backups of all data stored in /data/backups, each with a
 - [ ] **BAK.25** `spakr verify` and `spakr repair` cover the backup set: checksums and parity of the latest backups, repair of a damaged backup from parity, and restore from backup as a repair source [0.2] — needs: INT.10, BAK.8
 - [ ] **BAK.26** Restore drill: `spakr restore --drill` restores the latest backup into scratch space and compares it with the live data, run monthly by a timer, result kept in the status [0.7] — needs: BAK.14, BAK.16
 - [ ] **BAK.27** Backup and recovery guide: settings, timer install, restore steps, secrets policy, off-host copy, retention, hardening, the drill [0.9] — needs: BAK.22, BAK.26, BAK.17
+- [ ] **BAK.28** Media pool garbage collection: reference-counted by retained backup indexes, deletes only unreferenced files after a newer backup verified [0.7] — needs: BAK.14, BAK.15
 
 ## CFG: Configuration and settings
 
