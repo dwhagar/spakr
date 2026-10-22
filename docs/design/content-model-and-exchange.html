@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content model and exchange - spakr design</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Design</a><a href="database.html">Database design</a><a href="integrity-backup.html">Integrity and backup</a><a href="content-model-and-exchange.html">Content model and exchange</a></nav><main>
+<h1>Content model and exchange</h1>
+
+<p>Status: <strong>draft design for review</strong>, 2026-10-22. Closes <code>RES.13</code> (entity field definitions and front matter schema) and <code>RES.19</code> (import and export formats). Unblocks <code>ENT.1</code> to <code>ENT.14</code>, <code>GIT.9</code>, <code>LNK.3</code> and <code>OPS.6</code>. Extends <a href="database.html">Database design</a>; where the two disagree, this page is the proposal and says which table changes. The sibling page <a href="integrity-backup.html">Integrity, parity and backup</a> (<code>RES.26</code> to <code>RES.30</code>) owns parity, backup archives and restore, and classifies every table as source of truth (S), rebuildable (R) or disposable (D); this page follows that classification (section 3.2) and only says what exchange files contain and how they are read safely.</p>
+
+<h2>Summary</h2>
+<ul>
+<li><strong>One page = one Markdown file.</strong> A YAML front matter block holds everything that is not prose: common header, one lead image, the typed fields (the infobox) and the relations. The body holds only prose. The two are never mixed: no field lives in the body and no prose lives in a field.</li>
+<li><strong>Types are described by data, not code.</strong> A type registry (one small YAML file per type, shipped with the software) lists the fields, their kinds, labels, infobox order and which vocabulary they draw from. The same registry drives validation, the editor form (ENT.13), the infobox (ENT.14), search filters (SEARCH.4), the OpenAPI schemas and import.</li>
+<li><strong>Front matter is YAML read by a hardened loader.</strong> Measured here: PyYAML's default loader turns <code>no</code> into <code>false</code>, <code>0750</code> into 488 and <code>2001-02-03</code> into a date, so a "size: no" or a language code <code>NO</code> would be silently corrupted. A subclassed loader fixes all three, rejects anchors and tags, and parses a page in 0.13 ms (default: 0.93 ms).</li>
+<li><strong>Exchange has one native format and two friendly ones.</strong> The native bundle is a zip whose page entries are byte-identical to the files in git, so export then import is lossless and cheap. A plain folder of Markdown files (Obsidian-style) and CSV per type cover editing outside the site and bulk entry from a spreadsheet. Everything else is post-1.0.</li>
+<li><strong>Export never widens access.</strong> It contains exactly what the requester may see, GM-only pages included only for GM and admin. Import runs the same validation as the editor and is dry-run first.</li>
+<li><strong>Authorship in git</strong> (their Q8): commits carry an opaque permanent user id, never an email or display name, so <code>page_revision</code> can be rebuilt after a database loss. It is commit metadata, not front matter (section 2.5).</li>
+<li>Six decisions only the owner can make are collected at the end ("Open questions for the owner"), each with options and a recommendation.</li>
+</ul>
+
+<h2>1. Principles</h2>
+<ul>
+<li><strong>Git holds the truth, MySQL is a rebuildable index</strong> (RES.29, GIT.9). Therefore every non-derived datum is in the file and every column the index holds about fields is recomputed by <code>spakr rebuild-index</code>. Derived data (created, updated, author, revision, current commit, content hash) is never written into the file; it comes from git, and a hash of a file cannot sit inside the file.</li>
+<li><strong>System-agnostic rules content</strong> (decided): stat blocks, dice, costs, dates and measures are free text. Typed fields exist to label, browse, filter and link, not to calculate.</li>
+<li><strong>Readable and hand-editable.</strong> Someone with only a text editor and the git repository can read, fix and write a page. Keys are English <code>snake_case</code>, references are <code>type/slug</code>, and the server writes the block in a fixed key order so diffs show only what changed.</li>
+<li><strong>Lenient on read, strict on write.</strong> A page already in git is never made unreadable by a later vocabulary or schema change: unknown keys and retired vocabulary codes are kept and flagged. New writes through the UI, API or import are validated and rejected with a field-level error.</li>
+<li><strong>One mechanism for links.</strong> A typed reference field and a free relation both end up as rows in <code>relation</code> with a kind from the admin-managed vocabulary, so backlinks, browse and visibility filtering exist once.</li>
+</ul>
+
+<h2>2. Page file</h2>
+<h3>2.1 Layout</h3>
+<pre>---
+spakr: 1
+type: character
+title: Captain Mara Vell
+summary: Harbour master of Drift Station and reluctant legend.
+settings: [scifi]
+tags: [navy, veteran]
+aliases: [Mara, "The Old Woman of Drift"]
+visibility: public
+image: {media: "image/9f2c41d0", alt: "Portrait of Mara in a flight jacket", caption: "Mara in 2189"}
+fields:
+  status: alive
+  race: race/human
+  nation_state: nation-state/free-ports
+  home_place: place/drift-station
+  occupation: Harbour master
+  born: "2141, Mars"
+relations:
+  - {kind: member_of, to: entity/harbour-guild, note: "since 2185"}
+  - {kind: rival_of, to: character/jonas-keel}
+former_slugs: [mara-v]
+---
+
+She keeps the station's lights on.
+
+## Background
+...
+</pre>
+<p>The file starts with <code>---</code> on the first line and the block ends at the next line that is exactly <code>---</code>. Everything after is the body, passed to the renderer untouched. Line endings are normalised to LF and a leading BOM is dropped on read; the writer always emits LF, UTF-8, NFC, with a single trailing newline.</p>
+
+<h3>2.2 Common keys (every type)</h3>
+<table>
+<tr><th>Key</th><th>Kind</th><th>Rules</th></tr>
+<tr><td><code>spakr</code></td><td>int</td><td>Front matter format version, 1 for this design. Required. Bumped only for incompatible changes; a migration command rewrites files as a normal commit.</td></tr>
+<tr><td><code>type</code></td><td>enum</td><td>One of the registered types (<code>character</code>, <code>item</code>, <code>place</code>, <code>spell</code>, <code>ability</code>, <code>skill</code>, <code>entity</code>, <code>race</code>, <code>nation-state</code>, <code>page</code>). Must match the directory the file is in; a mismatch is a verify error, the path wins for the index.</td></tr>
+<tr><td><code>title</code></td><td>line</td><td>Required, 1 to 200 characters.</td></tr>
+<tr><td><code>summary</code></td><td>line</td><td>Up to 500 characters. Used for lists, search results and the SEO description. Plain text with inline Markdown.</td></tr>
+<tr><td><code>settings</code></td><td>list of codes</td><td>One or more codes from the <code>setting</code> table (<code>high_fantasy</code>, <code>modern_horror</code>, <code>scifi</code>, admin-extensible). Required, at least one (decided: settings are tags).</td></tr>
+<tr><td><code>tags</code></td><td>list of lines</td><td>Free tags, each up to 60 characters, lower-cased and trimmed by the writer; at most 30.</td></tr>
+<tr><td><code>aliases</code></td><td>list of lines</td><td>Other names, searched and offered by link completion; not redirects.</td></tr>
+<tr><td><code>former_slugs</code></td><td>list of slugs</td><td>Old slugs that redirect here (the contents of <code>page_alias</code>), so a rebuild keeps redirects. Written by rename (GIT.6).</td></tr>
+<tr><td><code>visibility</code></td><td>enum</td><td><code>public</code> (default when absent) or <code>gm</code>. Section 6 covers handling. The key <code>visibility_group</code> is reserved and rejected in 1.0.</td></tr>
+<tr><td><code>image</code></td><td>mapping</td><td>The lead image, optional. <code>media</code> is the same reference the body uses (<code>kind/hash-prefix</code>, resolved to a published upload), <code>alt</code> required when <code>media</code> is set, <code>caption</code> optional line. One image only; galleries and inline pictures are body media syntax. Rendered in the infobox header, never inside the prose.</td></tr>
+<tr><td><code>fields</code></td><td>mapping</td><td>The type's typed fields (2.3), keys from the registry.</td></tr>
+<tr><td><code>relations</code></td><td>list of mappings</td><td>Free relations: <code>kind</code> (code from <code>relation_kind</code>), <code>to</code> (<code>type/slug</code>), optional <code>note</code> up to 300 characters.</td></tr>
+</table>
+<p>Not in the file: id, created, updated, authors, revisions, current commit, content hash, search text. Unknown top-level keys are preserved verbatim on edit (in a block the editor does not show) and reported by <code>spakr verify</code> as warnings; a key starting <code>x_</code> is reserved for local extensions and never warned about.</p>
+
+<h3>2.3 Field kinds</h3>
+<table>
+<tr><th>Kind</th><th>In the file</th><th>Stored in the index</th><th>Notes</th></tr>
+<tr><td><code>line</code></td><td>string, one line, inline Markdown, default maximum 200 characters</td><td>text</td><td>Costs, dates, measures, stat summaries. Anything longer or with block structure belongs in the body.</td></tr>
+<tr><td><code>int</code></td><td>decimal integer</td><td>integer</td><td>Only where sorting matters (spell level).</td></tr>
+<tr><td><code>bool</code></td><td><code>true</code> or <code>false</code> only</td><td>boolean</td><td></td></tr>
+<tr><td><code>choice</code></td><td>code from a named vocabulary</td><td>code</td><td>Vocabularies are admin-managed like <code>relation_kind</code> (code, label, retired flag, order). A retired or unknown code stays readable and is flagged.</td></tr>
+<tr><td><code>ref</code></td><td><code>type/slug</code> of another page, target types listed in the registry</td><td>relation row</td><td>Resolved through slug and <code>former_slugs</code>. A dangling reference is allowed (it renders as a red link) and warned about, because creation order must not matter.</td></tr>
+<tr><td><code>refs</code></td><td>list of <code>type/slug</code></td><td>relation rows</td><td>Ordered. At most 50.</td></tr>
+<tr><td><code>lines</code></td><td>list of lines</td><td>text, joined</td><td>Languages, aliases of a thing, short bullet-style facts. At most 20.</td></tr>
+</table>
+<p>Deliberately absent: date, number with unit, money, dice, rich text and file fields. In-world dates follow each setting's own calendar and units differ per game system; typing them would force a choice the owner has already declined (free text). See open question 6.</p>
+<p>Each field in the registry also carries: <code>key</code>, <code>label</code>, <code>help</code>, <code>required</code>, <code>group</code> and <code>order</code> (infobox sections), <code>show_for</code> (optional list of settings, a hint that hides the field in the form and infobox when none apply, never a validation rule), <code>filter</code> (offer it in browse and field search), <code>relation</code> (for <code>ref</code> and <code>refs</code>: the <code>relation_kind</code> code the index writes) and <code>since</code> (schema version). A field is never deleted from the registry, only retired, so old pages stay valid.</p>
+
+<h3>2.4 YAML subset and loader</h3>
+<p>PyYAML 6.0.3 (already chosen) with a hardened loader, tested in <a href="poc/frontmatter_poc.py"><code>poc/frontmatter_poc.py</code></a>. Measured on this machine (PyYAML with libyaml):</p>
+<table>
+<tr><th>Input</th><th>Default <code>safe_load</code></th><th>Hardened loader</th></tr>
+<tr><td><code>size: no</code></td><td><code>False</code></td><td><code>"no"</code></td></tr>
+<tr><td><code>lifespan: 0750</code></td><td><code>488</code> (octal)</td><td><code>"0750"</code></td></tr>
+<tr><td><code>languages: [NO, on, 1e3]</code></td><td><code>[False, True, "1e3"]</code></td><td><code>["NO", "on", "1e3"]</code></td></tr>
+<tr><td><code>founded: 2001-02-03</code></td><td>a <code>date</code> object</td><td><code>"2001-02-03"</code></td></tr>
+<tr><td>anchor and alias (<code>&amp;x</code>, <code>*x</code>), explicit tags</td><td>accepted (the alias bomb is possible)</td><td>rejected</td></tr>
+<tr><td>Parse 5,000 front matters</td><td>4.6 to 4.8 s (this run used the pure-Python safe loader)</td><td>0.67 s, 0.85 s with the anchor and tag check</td></tr>
+</table>
+<p>Rules: only the loader's own booleans are <code>true</code> and <code>false</code>; integers are plain decimal with no leading zero; there is no timestamp type; anchors, aliases and explicit tags are errors; the block may not exceed 32 KB or nest deeper than 4 levels; duplicate keys are errors; every value must be a string, integer, boolean, list or mapping. The writer is the only producer in normal use: it dumps with a fixed key order, block style for the registry-defined structure, always double-quotes strings that would otherwise resolve to anything other than a string, and never emits flow style except for the two documented one-liners (<code>image</code>, a relation). Applying the registry kind on read means a value for a <code>line</code> field that is not a string is coerced back to its source text where possible and flagged otherwise.</p>
+
+<h3>2.5 Authorship lives in the commit, not the file</h3>
+<p>This answers question 8 of the integrity and backup page. Who wrote a revision is stored in git commit metadata and never in front matter (it is derived data, and a file cannot honestly contain the commit that changes it). To make <code>page_revision.author_id</code> rebuildable from git alone, the content store writes every commit as:</p>
+<pre>author/committer name   u-k3m7q9x2p4          (user.public_id, random, permanent, never reused)
+author/committer email  k3m7q9x2p4@users.spakr.invalid   (.invalid is reserved and never resolves)
+message                 first line: edit summary (or "Edit &lt;title&gt;"); trailers where relevant:
+                        Reverts: &lt;sha&gt;   Import-Id: &lt;id&gt;   Renamed-From: &lt;type/slug&gt;</pre>
+<ul>
+<li>The id is generated once when the account is created (10 characters from a 32-letter alphabet, collision-checked) and stored in <code>user.public_id</code>. It is not secret, but it is opaque: it holds no email, name or sequence, so a clone of the repository (backups, bundles) exposes no personal data.</li>
+<li>Display name and profile are looked up from the user table at read time, so renames take effect on all old revisions. Erasing a person clears the user row; the id remains in history and means nothing (the pseudonymous identity RES.29 relied on, with no history rewrite).</li>
+<li>System actions (setup seed, schema migration of front matter, import under a service key) use a reserved id <code>u-system</code>; imports use the importing user as author.</li>
+<li>Rebuild: <code>spakr rebuild-index</code> maps <code>public_id</code> to <code>user.id</code> for <code>page_revision</code>; an id with no user (account erased or database lost) becomes author "unknown" with the id kept in the row.</li>
+<li>If the owner chooses their option B or C, the front matter and exchange formats do not change; only the commit writer and the rebuild mapping do. I therefore recommend option A and add no separate question here.</li>
+</ul>
+
+<h2>3. Type registry and field lists</h2>
+<h3>3.1 Approach</h3>
+<p>Each type is one YAML file shipped in the package (<code>src/spakr/schema/types/character.yaml</code> and so on) plus a vocabulary seed file. At start-up the registry is loaded, checked (unique keys, known kinds, existing vocabularies and target types) and exposed as a Python object and as JSON at <code>/api/v1/schema</code> (ENT.13). A migration seeds vocabularies. The schema has an integer <code>schema_version</code> that counts up on any change and is reported by the status endpoint next to the API and database versions. The registry also generates the OpenAPI component schema per type, so documentation and validation cannot drift (RES.14 chose a hand-written description; this part is generated from the registry into it).</p>
+<p>The index stores fields in one narrow table instead of one table per type:</p>
+<pre>page_field(page_id, field_key, position, value_text NULL, value_int NULL,
+           value_bool NULL, ref_page_id NULL)
+  primary key (page_id, field_key, position)
+  index (field_key, value_text(100)), index (field_key, value_int), index (ref_page_id)</pre>
+<p>A <code>ref</code> value is stored here and also written as a <code>relation</code> row with the field's declared relation kind, in one transaction (the field row exists for display order and form round-tripping; the relation row is what backlinks and traversal use). A search document (SEARCH.2) takes the text of <code>line</code>, <code>lines</code> and <code>choice</code> labels, not the titles of referenced pages (section 6).</p>
+<p><strong>Change to the database design:</strong> the nine type tables in <a href="database.html">Database design</a> are replaced by <code>page_field</code>, so <code>DB.2</code> no longer adds them. Everything those tables held is expressible; indexes are per field key. Reason: adding or retiring a field becomes a registry change plus <code>spakr rebuild-index</code>, not an Alembic migration per type, and a rebuild from git is one loop over pages instead of nine table writers. The cost is slightly more awkward SQL for multi-field filters (one join per filtered field); for browse by type plus two filters on a few thousand pages this is a few milliseconds, to be confirmed by a benchmark in ENT.1 before the old tables are removed from the plan.</p>
+
+<h3>3.2 Classification (follows the integrity page)</h3>
+<table>
+<tr><th>Item</th><th>Class</th><th>Notes</th></tr>
+<tr><td>Page files (front matter and body), including <code>fields</code>, <code>relations</code>, <code>tags</code>, <code>settings</code>, <code>aliases</code>, <code>former_slugs</code>, <code>visibility</code>, <code>image</code></td><td>S (git)</td><td>The only copy of this information; parity and bundles protect it.</td></tr>
+<tr><td><code>page</code>, <code>page_alias</code>, <code>page_setting</code>, <code>tag</code>, <code>page_tag</code>, <code>relation</code>, <code>page_link</code>, <strong><code>page_field</code></strong> (replaces the type tables), <code>page_revision</code></td><td>R from git</td><td><code>spakr rebuild-index</code> (DB.3); <code>page_revision</code> also needs <code>user.public_id</code> (2.5).</td></tr>
+<tr><td>Type registry (<code>src/spakr/schema/types/*.yaml</code>) and its <code>schema_version</code></td><td>S (code repository)</td><td>Ships with the software; not user data, not in <code>/data</code>.</td></tr>
+<tr><td>Vocabularies (<code>choice_set</code>, <code>choice_value</code>), <code>setting</code>, <code>relation_kind</code></td><td>S (MySQL only)</td><td>Admin choices that files refer to by code. Journaled and row-checksummed like <code>relation_kind</code> in their table (INT.2, INT.9). Losing them leaves codes in files with no labels, so they are in every dump and journal.</td></tr>
+<tr><td>Search document, render cache, fields JSON and form schema responses</td><td>R</td><td>Derived on save, import and rebuild.</td></tr>
+<tr><td>Export bundles, import reports, uploaded import archives</td><td>D</td><td>Deleted by expiry (24 hours for downloads, 30 days for reports). Not backed up; the content store is.</td></tr>
+</table>
+
+<h3>3.3 Common infobox</h3>
+<p>The infobox is rendered from the page's <code>image</code> and <code>fields</code> only, in registry <code>group</code> and <code>order</code>, beside the prose on wide screens and stacked above it on narrow ones (ENT.14). Empty fields are omitted. A <code>ref</code> becomes an entity link chip, subject to section 6. Nothing about the infobox is ever inferred from the body, and editing the body never changes a field.</p>
+
+<h3>3.4 Per-type field lists</h3>
+<p>The proposal. "Voc." means a vocabulary seeded at install and managed by admins; the starter values are given in each row. Every list begins with the common keys of 2.2 and is intended as the acceptance list for <code>ENT.2</code> to <code>ENT.11</code>. Each type also ships a suggested body outline (headings the editor offers for a new page, not enforced).</p>
+<table>
+<tr><th>Type</th><th>Field (kind)</th><th>Notes</th></tr>
+<tr><td rowspan="9"><strong>Character</strong><br>ENT.2<br>outline: Appearance, Personality, Background, Relationships, Stats</td>
+<td><code>character_kind</code> (choice, voc.)</td><td>player character, NPC, historical, other</td></tr>
+<tr><td><code>status</code> (choice, voc.)</td><td>alive, dead, missing, unknown, other</td></tr>
+<tr><td><code>race</code> (ref race)</td><td>relation kind <code>is_race</code></td></tr>
+<tr><td><code>nation_state</code> (ref nation-state)</td><td><code>citizen_of</code></td></tr>
+<tr><td><code>home_place</code> (ref place)</td><td><code>native_of</code></td></tr>
+<tr><td><code>occupation</code> (line)</td><td></td></tr>
+<tr><td><code>affiliations</code> (refs nation-state, entity)</td><td><code>member_of</code></td></tr>
+<tr><td><code>born</code>, <code>died</code> (line)</td><td>in-world dates, free text</td></tr>
+<tr><td><code>age</code>, <code>epithet</code> (line)</td><td>epithet is a title or nickname shown under the name</td></tr>
+<tr><td rowspan="8"><strong>Item and technology</strong><br>ENT.3<br>outline: Description, Use, Effects, Requirements, History</td>
+<td><code>item_category</code> (choice, voc.)</td><td>weapon, armour, tool, vehicle, software, artifact, clothing, consumable, structure, other</td></tr>
+<tr><td><code>grade</code> (line)</td><td>rarity or tech level; free because the scale differs per setting (<code>show_for</code> not used, one label "Rarity / tech level")</td></tr>
+<tr><td><code>cost</code>, <code>weight</code> (line)</td><td></td></tr>
+<tr><td><code>requires</code> (refs skill, ability, item, race)</td><td><code>requires</code></td></tr>
+<tr><td><code>grants</code> (refs ability, spell)</td><td><code>grants</code></td></tr>
+<tr><td><code>made_by</code> (ref character, entity, nation-state)</td><td><code>created_by</code></td></tr>
+<tr><td><code>origin</code> (ref place)</td><td><code>originates_in</code></td></tr>
+<tr><td><code>manufacturer_model</code> (line)</td><td>scifi and modern flavour; shown only for those settings</td></tr>
+<tr><td rowspan="5"><strong>Place</strong><br>ENT.4<br>outline: Overview, Geography, Inhabitants, Points of interest, History</td>
+<td><code>place_kind</code> (choice, voc.)</td><td>planet, moon, continent, country, region, city, town, district, building, room, dungeon, ocean, wilderness, station, ship, plane, other</td></tr>
+<tr><td><code>parent</code> (ref place)</td><td><code>located_in</code>; the tree, resolved with recursive CTEs; cycles are an error on write</td></tr>
+<tr><td><code>map_ref</code> (line)</td><td>coordinates or map label, free text</td></tr>
+<tr><td><code>population</code>, <code>climate</code> (line)</td><td></td></tr>
+<tr><td colspan="2">Who controls a place and who lives there are not place fields: they are stated once, on the nation-state (<code>territory</code>) and the race or entity (<code>homelands</code>, <code>habitat</code>) and shown on the place page as derived "Controlled by" and "Inhabitants" rows. A place's position in the tree (<code>parent</code>) is the one structural field; its <code>ref_page_id</code> is indexed for the recursive queries.</td></tr>
+<tr><td rowspan="9"><strong>Magic and psionics</strong><br>ENT.5<br>outline: Effect, Casting, Limits, Variants, Lore</td>
+<td><code>discipline</code> (choice, voc.)</td><td>magic, psionics, ritual, technique, other</td></tr>
+<tr><td><code>level</code> (int, optional)</td><td></td></tr>
+<tr><td><code>school</code> (line)</td><td>school, tradition or discipline branch</td></tr>
+<tr><td><code>cost</code>, <code>range</code>, <code>duration</code>, <code>casting_time</code> (line)</td><td>free text; dice and units not parsed</td></tr>
+<tr><td><code>requirements</code> (line)</td><td>components, focus, conditions</td></tr>
+<tr><td><code>prerequisites</code> (refs skill, ability)</td><td><code>requires</code></td></tr>
+<tr><td><code>taught_by</code> (refs character, entity)</td><td><code>taught_by</code></td></tr>
+<tr><td colspan="2">Magic systems (not single spells) are ordinary pages of this type with no level.</td></tr>
+<tr><td><code>tradition</code> (ref page)</td><td>optional link to the page that describes the system</td></tr>
+<tr><td rowspan="5"><strong>Ability</strong><br>ENT.6<br>outline: Effect, Activation, Limits</td>
+<td><code>source_kind</code> (choice, voc.)</td><td>race, entity, trait, training, item, innate, other</td></tr>
+<tr><td><code>source</code> (ref race, entity, item, character)</td><td><code>granted_by</code></td></tr>
+<tr><td><code>activation</code> (line)</td><td>passive, action, reaction, free text</td></tr>
+<tr><td><code>cost</code>, <code>frequency</code> (line)</td><td></td></tr>
+<tr><td><code>prerequisites</code> (refs skill, ability)</td><td><code>requires</code></td></tr>
+<tr><td rowspan="5"><strong>Skill</strong><br>ENT.7<br>outline: Use, Training, Specialisations</td>
+<td><code>skill_category</code> (choice, voc.)</td><td>combat, social, knowledge, craft, movement, technical, other</td></tr>
+<tr><td><code>governing_attribute</code> (line)</td><td>free: attribute names are the system's</td></tr>
+<tr><td><code>prerequisites</code> (refs skill, ability, race)</td><td><code>requires</code></td></tr>
+<tr><td><code>training</code> (line)</td><td>time or cost to learn</td></tr>
+<tr><td><code>untrained</code> (bool)</td><td>usable without training</td></tr>
+<tr><td rowspan="7"><strong>Entity</strong> (creatures, beings, organisations)<br>ENT.8<br>outline: Nature, Abilities, Behaviour, Lair and range, Lore</td>
+<td><code>entity_kind</code> (choice, voc.)</td><td>deity, demon, spirit, cosmic horror, creature, undead, construct, AI, organisation, other</td></tr>
+<tr><td><code>domain</code> (line)</td><td></td></tr>
+<tr><td><code>status</code> (choice, voc.)</td><td>active, dormant, destroyed, unknown (shared vocabulary name <code>being_status</code>)</td></tr>
+<tr><td><code>threat</code> (line)</td><td>free text; the game system's rating</td></tr>
+<tr><td><code>habitat</code> (refs place)</td><td><code>located_in</code></td></tr>
+<tr><td><code>allegiances</code> (refs entity, nation-state)</td><td><code>allied_with</code></td></tr>
+<tr><td><code>abilities</code> (refs ability, spell)</td><td><code>has_ability</code></td></tr>
+<tr><td rowspan="6"><strong>Race</strong> (species)<br>ENT.9<br>outline: Traits, Society, Appearance, Homelands</td>
+<td><code>lifespan</code>, <code>size</code> (line)</td><td></td></tr>
+<tr><td><code>homelands</code> (refs place, nation-state)</td><td><code>native_of</code></td></tr>
+<tr><td><code>grants</code> (refs ability, skill)</td><td><code>grants</code></td></tr>
+<tr><td><code>languages</code> (lines)</td><td></td></tr>
+<tr><td><code>kin</code> (refs race)</td><td><code>related_to</code></td></tr>
+<tr><td><code>playable</code> (bool)</td><td>offered for character creation</td></tr>
+<tr><td rowspan="8"><strong>Nation-state</strong><br>ENT.10<br>outline: Government, Territory, Society, Foreign relations, History</td>
+<td><code>government_form</code> (line)</td><td></td></tr>
+<tr><td><code>capital</code> (ref place)</td><td><code>capital_of</code> (written from the place to this page)</td></tr>
+<tr><td><code>ruler</code> (ref character, entity)</td><td><code>rules</code></td></tr>
+<tr><td><code>territory</code> (refs place)</td><td><code>controls</code></td></tr>
+<tr><td><code>dominant_races</code> (refs race)</td><td><code>has_population</code></td></tr>
+<tr><td><code>founded</code>, <code>population</code>, <code>currency</code> (line)</td><td></td></tr>
+<tr><td><code>allies</code>, <code>rivals</code> (refs nation-state, entity)</td><td><code>allied_with</code>, <code>rival_of</code> (symmetric)</td></tr>
+<tr><td colspan="2"><strong>Rule for all types:</strong> a fact is written in the file of one page only, and the other page shows it as a derived row from the inverse relation. Territory and capital are stated on the nation-state; the place page derives "Controlled by" and "Capital of". The editor offers the inverse as a shortcut that edits the owning page.</td></tr>
+<tr><td><strong>Free page</strong><br>ENT.11</td><td>none</td><td>Common keys only. The type exists for lore, rules, session notes and special pages; its tags are its categories.</td></tr>
+</table>
+<p>Each setting (ENT.12) differs only by tag, theme and by which vocabulary values and <code>show_for</code> hints appear; no type exists in only one setting. The single field <code>grade</code> on items and the free text <code>threat</code> on entities are the deliberate answer to "rarity in fantasy, tech level in scifi, threat in horror".</p>
+
+<h3>3.5 Relation kinds (hooks and starter set)</h3>
+<p>The vocabulary is fixed, admin-managed and seeded by migration (decided). This design adds the hooks the field registry needs. Columns added to <code>relation_kind</code> beyond those in <a href="database.html">Database design</a>:</p>
+<ul>
+<li><code>from_types</code> and <code>to_types</code> (JSON lists, empty = any): the page types the kind may join. Validated on write; a violation in git is a warning (lenient on read). This is also what the editor uses to filter the "add relation" picker.</li>
+<li><code>symmetric</code> (bool): one row serves both directions (<code>allied_with</code>). The writer stores the page whose <code>type/slug</code> sorts first as <code>from</code>.</li>
+<li><code>derived</code> (bool, system kinds only): kinds that fields write (<code>is_race</code>, <code>citizen_of</code>), hidden from the free "add relation" picker but shown in related lists. Retiring or renaming a kind never changes files: the code in the file stays and is reported as unknown only if the kind is hard-deleted, which the admin API refuses while any page uses it.</li>
+</ul>
+<table>
+<tr><th>Code</th><th>Label / inverse</th><th>From to</th><th>Origin</th></tr>
+<tr><td><code>member_of</code></td><td>member of / has member</td><td>character, entity to nation-state, entity</td><td>field and free</td></tr>
+<tr><td><code>located_in</code></td><td>located in / contains</td><td>place, entity, item to place</td><td>field (<code>parent</code>, <code>habitat</code>)</td></tr>
+<tr><td><code>native_of</code></td><td>native of / home of</td><td>character, race to place, nation-state</td><td>field</td></tr>
+<tr><td><code>citizen_of</code></td><td>citizen of / has citizen</td><td>character to nation-state</td><td>field</td></tr>
+<tr><td><code>is_race</code></td><td>race / members</td><td>character to race</td><td>field</td></tr>
+<tr><td><code>rules</code> / <code>ruled_by</code></td><td>rules / ruled by</td><td>character, entity to nation-state, place</td><td>field and free</td></tr>
+<tr><td><code>controls</code></td><td>controls / controlled by</td><td>nation-state to place</td><td>field</td></tr>
+<tr><td><code>grants</code></td><td>grants / granted by</td><td>race, item, entity to ability, spell, skill</td><td>field and free</td></tr>
+<tr><td><code>requires</code></td><td>requires / required by</td><td>item, spell, ability, skill to skill, ability, item, race</td><td>field and free</td></tr>
+<tr><td><code>has_ability</code></td><td>has ability / possessed by</td><td>character, entity, race to ability, spell</td><td>field and free</td></tr>
+<tr><td><code>created_by</code></td><td>created by / created</td><td>item, place, entity to character, entity, nation-state</td><td>field and free</td></tr>
+<tr><td><code>taught_by</code></td><td>taught by / teaches</td><td>spell, skill, ability to character, entity</td><td>field and free</td></tr>
+<tr><td><code>allied_with</code></td><td>allied with</td><td>character, entity, nation-state (symmetric)</td><td>field and free</td></tr>
+<tr><td><code>rival_of</code></td><td>rival of</td><td>character, entity, nation-state (symmetric)</td><td>field and free</td></tr>
+<tr><td><code>worships</code></td><td>worships / worshipped by</td><td>character, race, nation-state to entity</td><td>free</td></tr>
+<tr><td><code>capital_of</code></td><td>capital of / has capital</td><td>place to nation-state</td><td>field (<code>capital</code>)</td></tr>
+<tr><td><code>originates_in</code></td><td>originates in / origin of</td><td>item to place</td><td>field (<code>origin</code>)</td></tr>
+<tr><td><code>related_to</code></td><td>related to</td><td>any (symmetric)</td><td>free, the catch-all</td></tr>
+</table>
+<p>Whether to seed family kinds (parent of, partner of, sibling of) is open question 4.</p>
+
+<h2>4. Import and export</h2>
+<h3>4.1 Formats</h3>
+<table>
+<tr><th>Format</th><th>Direction</th><th>Contents</th><th>Use</th></tr>
+<tr><td><strong>Single page</strong> (<code>.md</code>)</td><td>export and import</td><td>The page file: front matter plus body. <code>GET /api/v1/pages/{type}/{slug}?format=md</code>; import as a new revision with the base-revision check of GIT.7.</td><td>Edit in a local editor and upload; share one page.</td></tr>
+<tr><td><strong>Bundle</strong> (<code>.zip</code>)</td><td>export and import</td><td>See 4.2. Native, lossless.</td><td>Move content between installs, take a snapshot of a subset, seed a new install, hand a campaign to another site.</td></tr>
+<tr><td><strong>Markdown folder</strong> (<code>.zip</code> of <code>.md</code> files)</td><td>import; export as a bundle without the manifest</td><td>Plain files with optional front matter, folders become types or tags by a mapping the importer shows.</td><td>Notes from Obsidian-style tools or a hand-built corpus. Wiki links <code>[[Name]]</code> are kept (they are already the body syntax).</td></tr>
+<tr><td><strong>CSV</strong> (one file per type)</td><td>export and import</td><td>One row per page: <code>slug</code>, <code>title</code>, <code>summary</code>, <code>settings</code>, <code>tags</code>, <code>visibility</code>, then one column per field key; list kinds joined with <code>|</code>; refs as <code>type/slug</code>. No body column.</td><td>Bulk-enter items or places in a spreadsheet; mass-edit one field. Creates stub pages with an empty body or updates fields of existing pages without touching their body.</td></tr>
+<tr><td>JSON Lines (<code>pages.jsonl</code>)</td><td>export only</td><td>One object per page: the parsed front matter, <code>body</code>, <code>revision</code>, <code>updated</code>.</td><td>Scripts and tools. The REST API with <code>?format=json</code> is the same shape.</td></tr>
+</table>
+<p>Not in 1.0: wiki-specific importers (MediaWiki XML, Kanka, World Anvil, Foundry and similar), XLSX or ODS, PDF or printable exports, static-site export, import of git history, importing into an existing install from a raw git repository. All are possible later through the Markdown folder format or the JSON shape, so nothing here blocks them. Their on-disk formats were not studied in this thread.</p>
+<p>Zip, not tar, for exchange: every desktop opens it without extra tools and Python's <code>zipfile</code> reads entries individually, which lets the importer validate the manifest before extracting anything. Backups stay tar (RES.30, sibling page).</p>
+
+<h3>4.2 Bundle layout</h3>
+<pre>spakr-export-2026-10-22T0132Z.zip
+  manifest.json             format, versions, scope, requester role, counts
+  SHA256SUMS                sha256 and path for every other entry
+  schema.json               registry snapshot (types, fields, vocabularies, settings, relation kinds)
+  pages/character/mara-vell.md       byte-identical to the git file
+  pages/place/drift-station.md
+  media/image/9f2c41d0/full.webp     optional (media included)
+  media/index.json                   hash, kind, mime, size, original name, alt hints
+</pre>
+<p><code>manifest.json</code> carries: <code>format</code> (<code>spakr-bundle</code> and its integer version, 1), <code>software_version</code>, <code>api_version</code>, <code>db_version</code>, <code>schema_version</code>, <code>exported_at</code>, <code>exported_by</code> (username), <code>role</code> at export, <code>scope</code> (everything visible, or filters: type, setting, tag, since), <code>include_media</code>, counts, and a <code>hidden_note</code> that says pages the requester could not see are absent. Identifiers (database ids, user ids, commit hashes) never leave: the page files carry slugs and <code>type/slug</code> references only. Authorship and history are not exported; the import records the importer as author. The full history is the git bundle of the backup (RES.17, RES.30), not an exchange format.</p>
+<p>Round trip rule, tested in ENT/OPS: export then import into an empty install of the same or a newer schema yields byte-identical page files, identical rebuilt index rows for fields, tags, settings, relations and former slugs, and identical search results. Import into an install with different vocabularies keeps unknown codes and reports them. Media is matched by SHA-256, so image references survive; a bundle without media imports with red media references the media library can resolve later.</p>
+
+<h3>4.3 Import procedure</h3>
+<ol>
+<li><strong>Upload and queue.</strong> The file is stored as an upload in quarantine and an import task runs on the Redis queue; nothing is written to the content store at this step.</li>
+<li><strong>Safe open.</strong> Entry names must be relative, contain no <code>..</code>, no symlinks, no absolute paths, no names outside <code>manifest.json</code>, <code>SHA256SUMS</code>, <code>schema.json</code>, <code>pages/&lt;type&gt;/&lt;slug&gt;.md</code> and <code>media/...</code>; nested archives are not opened. Limits (configurable): 500 MB uncompressed, 50,000 entries, 25 MB per page file, compression ratio 100:1 per entry. Hashes in <code>SHA256SUMS</code> must match.</li>
+<li><strong>Parse and validate all pages</strong> in memory with the hardened loader and the registry (2.4), the slug rules of GIT.6, and the body size limit. Collect warnings and errors per file; a file with an error is skipped, the rest continue.</li>
+<li><strong>Dry run report</strong> (always produced, JSON and an HTML view): counts of create, update, unchanged and skipped, a table of conflicts (page exists with different content), warnings (unknown keys, retired or unknown vocabulary codes, dangling references, missing media, visibility changes), and the permission checks. The user confirms; an admin can mark an import as pre-approved for scripted use (<code>?apply=true</code> with an API key that has the permission).</li>
+<li><strong>Apply in batches</strong> of 100 pages under the write lock (RES.4): write files, one <code>git add</code> and one commit per batch with the importer as author and a message <code>Import: &lt;file&gt; [import &lt;id&gt;] (n pages)</code>, then update the MySQL index and search documents inside the same lock hold, as for a normal save. A failure stops the run, leaves earlier batches committed, and reports exactly which. <code>revert import &lt;id&gt;</code> reverts the batch commits (new commits, history never rewritten, GIT.4).</li>
+<li><strong>Media</strong> from a bundle goes through the normal upload pipeline (type sniffing, ImageMagick/ffmpeg re-encode, hashes, quarantine rules) like any upload and is never trusted because it came in a bundle; matching hashes reuse existing media.</li>
+<li><strong>Audit</strong>: one audit entry for the import with counts and the report path; the report is kept for 30 days.</li>
+</ol>
+<p><strong>Conflict policy</strong> (chosen at upload, default "skip existing"): <em>create only</em> (existing pages are skipped), <em>update</em> (existing pages get a new revision when content differs, otherwise unchanged; the user sees the conflict list first), <em>replace</em> (as update but body and fields come wholly from the file). There is no mode that deletes pages absent from the bundle. Protected pages (SEC.26) and pages the importer may not edit are skipped and listed.</p>
+<p><strong>Single-page upload and CSV</strong> use the same pipeline with a one-page or field-only scope. CSV updates change only the columns present and write the new front matter through the same writer, so the body is untouched and the diff is a front matter diff.</p>
+
+<h3>4.4 Export procedure</h3>
+<ol>
+<li>Request with filters (type, setting, tag, since a revision or date, include media, format). Allowed for any signed-in role and anonymous callers only for the public subset if the admin enables it (default off, since bulk scraping).</li>
+<li>The query selects pages through the single visibility filter (VIS.2), so GM-only pages appear only for users with the GM or admin role (and API keys carrying those permissions).</li>
+<li>A queue task streams entries into a zip under <code>/data/exports/&lt;random 128-bit&gt;/</code> (mode 0600), reading each page file straight from the working tree (0.02 ms each from cache) and writing the manifest last. Nothing is built in memory beyond one page at a time.</li>
+<li>The requester gets a one-time authenticated download link; files are deleted after 24 hours and by the maintenance job. Each export is an audit entry; it is the only place where GM content leaves the system in bulk, so the log notes role and scope.</li>
+<li>CSV cells that begin with <code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>, tab or CR are prefixed with a single quote so a spreadsheet cannot execute them.</li>
+</ol>
+
+<h3>4.5 Measured</h3>
+<p>From <a href="poc/frontmatter_poc.py"><code>poc/frontmatter_poc.py</code></a> (this machine, Python 3.13): a bundle of 5,000 page files of about 650 bytes (front matter plus a short body) compressed to 1.6 MB; writing took 0.23 s, reading with hash verification and size checks took 0.13 s, and every file came back byte-identical (5,000 of 5,000). Parsing the front matter of 5,000 pages with the hardened loader took 0.85 s including anchor checks. The file-time costs of the git batch (about 26 ms for one commit of one file, RES.4) are expected to be amortised across 100 pages; that was <em>not</em> measured here and should be before OPS.6 is sized. Real pages are about 2.5 KB (RES.29), so a 5,000-page site is about 13 MB uncompressed and a few seconds to export.</p>
+
+<h2>5. Security</h2>
+<ul>
+<li><strong>YAML:</strong> hardened loader (2.4): no anchors, aliases or tags (alias bomb, object construction), size and depth caps, duplicate keys rejected, no implicit typing surprises that change data.</li>
+<li><strong>Zip:</strong> traversal and symlink checks, limits on count, size and ratio, entry-name whitelist, hash manifest verified before parsing, no extraction to disk (entries are read from the archive), no nested archives, archives kept in quarantine until processed.</li>
+<li><strong>Content from outside is untrusted</strong> exactly like editor input: the body is sanitised at render time as always (html sanitising, RES.3); infobox <code>line</code> values go through the same inline Markdown path and the same sanitiser; titles and aliases are escaped on output; slugs follow GIT.6; media is processed, never copied.</li>
+<li><strong>No privilege through the file:</strong> an imported page cannot choose its author, timestamps or id; <code>visibility: gm</code> and any change of visibility are honoured only when the importer is GM or admin; since import itself is a GM and admin permission by default (open question 6), a lower role that is later granted it can create and update public pages only, and cannot touch existing GM pages. Reference fields cannot reach pages the importer cannot see: they are stored as text and resolved at read time under the viewer's visibility.</li>
+<li><strong>Permission</strong> <code>content.import</code> (default GM and admin), <code>content.export</code> (default every signed-in user, scoped by visibility), both assignable to API keys but never wider than the owner's rights. Rate-limited and queue-limited (one import per user at a time).</li>
+<li><strong>Export is a leak risk</strong>: unguessable path, 0600, authenticated download, expiry, audit; the manifest states the requester's role so a bundle can be recognised as GM-level (backups of the same data are already treated as GM-level).</li>
+<li><strong>Information leaks around GM-only pages</strong>: section 6.</li>
+<li><strong>CSV injection</strong> on export (4.4); CSV import never evaluates anything, is UTF-8 only and rejects cells over the field maximum.</li>
+</ul>
+
+<h2>6. GM-only handling</h2>
+<ul>
+<li><strong>Storage:</strong> <code>visibility: gm</code> in the front matter (key omitted for public). The index column <code>page.visibility</code> mirrors it; the file wins on rebuild. Changing it is a normal revision.</li>
+<li><strong>Granularity in 1.0 is the page</strong> (decided: GM-only flag). Field-level and section-level secrecy are not offered (open question 2). The stable workaround is a linked GM-only companion page.</li>
+<li><strong>References from visible pages to GM-only pages.</strong> A <code>ref</code> or relation to a page the viewer cannot see is <em>omitted entirely</em> from the infobox, related list and API output, not shown as plain text: the target's title is itself the secret (RND.7 unwraps body links but body text is written by an author who chose those words, a field's text is the target's title). The count is not revealed either.</li>
+<li><strong>Search.</strong> The search document of a page contains its own text and <code>line</code> fields but <em>not the titles of referenced pages</em>, so a public page's searchable text cannot reveal a GM page. Field search on references goes through the <code>relation</code> table with the visibility join at query time (SEARCH.4), which also means flipping a page between public and GM requires reindexing that page only, not its referrers.</li>
+<li><strong>Rendered cache and API shape:</strong> the fields JSON and infobox are produced after the visibility filter, never cached per page without the viewer's visibility class in the key (RND.5, RND.7).</li>
+<li><strong>Export and import:</strong> sections 4.3 to 5. A bundle made by a non-GM contains no GM page and no mention of one except the manifest note that hidden pages are absent (without a count).</li>
+<li><strong>Reserved:</strong> <code>visibility_group</code> in front matter and <code>page.visibility_group_id</code> (decided). In 1.0 a file containing the key is rejected so nothing silently starts meaning something later.</li>
+<li><strong>Raw repository:</strong> remains private; history, diff and blame are served only through the visibility filter (RES.29).</li>
+</ul>
+
+<h2>7. Efficiency</h2>
+<ul>
+<li>Reading a page for display never parses YAML: the render cache (RES.25) and the index serve it. YAML is parsed on save, on rebuild, on import and for the editor form.</li>
+<li>Rebuild of 5,000 pages: file read 0.09 s (RES.29) plus front matter parsing 0.85 s, then index writes in transactions of a few hundred pages. The hardened loader matters here (about five times faster than the pure-Python default).</li>
+<li>Registry is loaded once per process (a few KB); the form schema JSON is served with a version ETag.</li>
+<li>Fields as rows: one write per field per save (up to about 15), indexed lookups per key; fine for thousands of pages. Browse by type plus up to two filters is a self-join per filter; benchmark in ENT.1 against 20,000 pages before locking the choice.</li>
+<li>Bundles stream; import holds the git lock per batch, not for the whole run, so editors are not locked out for the duration of a large import.</li>
+</ul>
+
+<h2>8. What this unblocks</h2>
+<table>
+<tr><th>Item</th><th>What it gets from this page</th></tr>
+<tr><td><code>GIT.9</code></td><td>The front matter schema of section 2; the writer and loader; what is derived and so excluded. Needs: serializer with fixed order, strict loader, round-trip tests.</td></tr>
+<tr><td><code>ENT.1</code></td><td>Registry format, field kinds, vocabularies, the <code>page_field</code> table and its rebuild; the status endpoint reports <code>schema_version</code>.</td></tr>
+<tr><td><code>ENT.2</code> to <code>ENT.11</code></td><td>The field list per type (3.4) as the acceptance criteria and the body outline.</td></tr>
+<tr><td><code>ENT.13</code>, <code>UI.24</code></td><td>Schema JSON at <code>/api/v1/schema</code>: kinds, labels, help, groups, order, <code>show_for</code>, vocabulary choices; the form is generated; the editor writes the front matter.</td></tr>
+<tr><td><code>ENT.14</code></td><td>Infobox from <code>image</code> and <code>fields</code> only, groups and order from the registry, omit empty and hidden references.</td></tr>
+<tr><td><code>LNK.3</code>, <code>LNK.6</code></td><td>Relation kind hooks (<code>from_types</code>, <code>to_types</code>, <code>symmetric</code>, <code>derived</code>), starter set, admin API.</td></tr>
+<tr><td><code>DB.2</code>, <code>DB.3</code></td><td>Replace the type tables with <code>page_field</code> (migration); rebuild loops pages and writes fields, relations, aliases, tags, settings.</td></tr>
+<tr><td><code>SEARCH.2</code>, <code>SEARCH.4</code></td><td>What goes in the search document (own text and line fields, not referenced titles); field filters on <code>page_field</code> and relations.</td></tr>
+<tr><td><code>OPS.6</code></td><td>Formats, bundle layout, procedure, limits and permissions of section 4 and 5. Suggested split below.</td></tr>
+<tr><td><code>VIS.2</code>, <code>VIS.3</code></td><td>The omission rule for references and the no-referenced-titles rule for search, as leak-test cases.</td></tr>
+<tr><td><code>INT.1</code></td><td>Classification: page files (including front matter) are source of truth; <code>page_field</code>, <code>relation</code>, aliases, tags, settings and search rows are rebuildable; import reports are disposable.</td></tr>
+</table>
+<h3>Suggested new or split work items (for the TODO thread)</h3>
+<ul>
+<li><code>ENT.15</code> Hardened front matter loader and writer with tests (YAML 1.1 traps, anchors, size caps, fixed key order, round trip) [0.2], needs GIT.2.</li>
+<li><code>ENT.16</code> Vocabulary tables and admin API (<code>choice_set</code>, <code>choice_value</code>) with seeds from 3.4 [0.5], needs DB.2, AUTH.8.</li>
+<li><code>ENT.17</code> Browse-with-filters benchmark of <code>page_field</code> at 20,000 pages before removing the type tables from the plan [0.5], needs ENT.1.</li>
+<li><code>OPS.6</code> split: OPS.6a bundle export task and download; OPS.6b bundle import with dry-run report and batch commits; OPS.6c single-page <code>.md</code> import and export; OPS.6d CSV export and import; OPS.6e Markdown folder import with mapping; OPS.6f permissions, limits, audit and the safe-zip tests [0.9]; DOC.4 and the admin guide cover the formats.</li>
+<li>A <code>revert import</code> operation (GIT.4 follow-up) [0.9].</li>
+<li>A migration command for front matter format version changes (<code>spakr migrate-content</code>), needed only when <code>spakr: 2</code> exists [after 1.0].</li>
+</ul>
+
+<h2>9. Alternatives rejected</h2>
+<table>
+<tr><th>Alternative</th><th>Why not</th></tr>
+<tr><td>Nine type tables in MySQL (current database design)</td><td>Every added field is a migration; rebuild needs nine writers; schema as data is impossible. Kept as a fallback if the ENT.17 benchmark shows the field table is too slow.</td></tr>
+<tr><td>JSON column per page with generated columns</td><td>Fast to build, but indexes need one generated column per filterable field (a migration again), and cross-page reference joins are awkward. It is the second choice if <code>page_field</code> proves slow.</td></tr>
+<tr><td>JSON or TOML front matter</td><td>JSON has no comments and is hard to hand-edit; TOML nests lists of tables badly. YAML is already the chosen format (RES.1) and is made safe by the loader.</td></tr>
+<tr><td>Fields in a sidecar file next to the page</td><td>Two files per page: renames and reverts are no longer one atomic change, and merging histories gets harder. Front matter keeps one file, one commit, one hash.</td></tr>
+<tr><td>Infobox as a template in the body (MediaWiki-style <code>{{Infobox ...}}</code>)</td><td>Needs a template engine, mixes data with prose, cannot be validated or searched without parsing prose, and the owner asked for fields separate from page text.</td></tr>
+<tr><td>Typed numbers, dates, money and dice</td><td>Rule-system specific; the owner's decision is free text. A later optional field kind can be added without changing old pages.</td></tr>
+<tr><td>Stable UID in front matter and references by UID</td><td>Survives renames without rewriting referrers, but makes files unreadable and hand-editing error-prone. Instead: <code>type/slug</code> references, <code>former_slugs</code> resolution and (GIT.6) a rename that rewrites the referring field values in the same commit. The index stores resolved page ids, so lookups are by id.</td></tr>
+<tr><td>Field-level or section-level GM secrecy</td><td>Leaks through render cache, search text, history, diff and exports unless every path knows about it; the page-level flag is already decided. Offered as open question 2.</td></tr>
+<tr><td>Exporting an SQL dump or SQLite file</td><td>Leaks database ids and user data, ties the format to the schema, not readable without the app. The git bundle in the backup is the full-fidelity path.</td></tr>
+<tr><td>tar or tar.gz for exchange</td><td>Needs streaming to inspect; zip allows validating the manifest before reading entries and is openable by non-technical GMs. Backups stay tar.</td></tr>
+<tr><td>XLSX, ODS, PDF and static HTML exports in 1.0</td><td>Extra libraries, new attack surface and no round trip. CSV and Markdown cover the spreadsheet and offline-reading cases; print stylesheets cover paper.</td></tr>
+<tr><td>Stripping all GM pages from a non-GM export silently versus noting their absence</td><td>A note without a count tells the reader the bundle is incomplete without leaking how many pages exist.</td></tr>
+</table>
+
+<h2>10. What was not verified</h2>
+<ul>
+<li>Timings are from this sandbox with PyYAML 6.0.3 and libyaml, Python 3.13; Ubuntu 24.04 ships Python 3.12 and may differ, and the target app environment is a virtualenv (RES.15). Absolute numbers will change, ratios should not.</li>
+<li>The field table's browse and filter performance is reasoned, not measured (ENT.17).</li>
+<li>Batch commit speed for 100 pages and the effect on concurrent editors were not benchmarked.</li>
+<li>Importers for other tools were not studied; their formats are unverified here.</li>
+<li>No one has yet tried the field lists against real campaign material; the lists are a first pass from the plan's type table and common game-database practice and are expected to change during ENT.2 to ENT.11, which is why the registry is data.</li>
+</ul>
+
+<h2 id="questions">Open questions for the owner</h2>
+<p>For the TODO thread to turn into decision cards. Each has context, options, a recommendation and what depends on it. Nothing below blocks starting <code>GIT.9</code> or <code>ENT.1</code>; question 1 and 2 change what those build, so they are most useful early.</p>
+
+<h3>Q1. Can admins add their own fields and types, or are field lists fixed by the software?</h3>
+<p><strong>Context:</strong> The registry is data, so both are possible. Your game may want fields this design does not know (a custom attribute, a faction rating). Fixed lists are simpler to document, test and keep stable across upgrades; editable lists add an admin screen, validation of changes, and the need to migrate pages when a field is retired.</p>
+<ul>
+<li><strong>A. Fixed per release, admins manage only vocabularies</strong> (categories, kinds, statuses, relation kinds, settings). Custom needs are met by the body text and by the reserved <code>x_</code> keys.</li>
+<li><strong>B. Admins can add fields to existing types</strong> (kinds from section 2.3 only), retire them, and order them; types stay fixed.</li>
+<li><strong>C. Admins can also define new types.</strong></li>
+</ul>
+<p><strong>Recommendation: A for 1.0</strong>, with B scheduled for 1.x because the storage and form generation already support it. Fewer moving parts to get a stable 1.0 and a clean upgrade path. <em>Affects:</em> ENT.1, ENT.13, UI.7.</p>
+
+<h3>Q2. How secret can GM-only content be inside a mostly public page?</h3>
+<p><strong>Context:</strong> The decided GM flag is per page. A public NPC page with one secret (the villain is secretly her brother) would need a second, linked GM page. Finer control exposes secrets through search snippets, the render cache, history and diff, and exports unless every path honours it.</p>
+<ul>
+<li><strong>A. Page-level only</strong> (the current decision), use companion GM pages. References to GM pages are hidden from non-GM viewers (section 6).</li>
+<li><strong>B. Page-level plus GM-only fields</strong> (a field marked GM in the registry or per page).</li>
+<li><strong>C. Page-level plus GM-only sections</strong> in the body.</li>
+</ul>
+<p><strong>Recommendation: A</strong>; revisit B after 1.0 together with visibility groups (the key is reserved). Every extra granularity multiplies the leak tests (VIS.3). <em>Affects:</em> GIT.9, VIS.1 to VIS.3, SEARCH.2.</p>
+
+<h3>Q3. Are the per-type field lists right?</h3>
+<p><strong>Context:</strong> Section 3.4 is the first draft: roughly 5 to 9 fields per type. Fewer fields means less typing but less to browse and filter on; more fields means more empty infoboxes. Two specific choices: should characters carry a <code>status</code> (alive, dead, missing) and <code>character_kind</code> (player or non-player)? And should there be a "played by" field? The latter would put real people's names in public data, which I advise against.</p>
+<ul>
+<li><strong>A. Approve as drafted</strong>, tune during ENT.2 to ENT.11 with real pages.</li>
+<li><strong>B. Trim to a minimum</strong> (about 3 per type, the rest in the body), fastest to build and easiest to remember.</li>
+<li><strong>C. Expand now</strong> with fields you name for particular types.</li>
+</ul>
+<p><strong>Recommendation: A</strong> (with no "played by"). The lists are cheap to change before ENT starts because they are data. <em>Affects:</em> ENT.2 to ENT.11, ENT.14, SEARCH.4.</p>
+
+<h3>Q4. Which relation kinds should ship in the starter vocabulary?</h3>
+<p><strong>Context:</strong> Section 3.5 lists 18 kinds. The vocabulary is admin-editable afterwards, so this only sets the starting point. Family ties (parent of, partner of, sibling of) are common in character-driven games but are nine more kinds if covered in full.</p>
+<ul>
+<li><strong>A. The 18 kinds as listed</strong>, with <code>related_to</code> for anything else.</li>
+<li><strong>B. A plus a small family set</strong> (<code>parent_of</code> with inverse <code>child_of</code>, <code>partner_of</code>, <code>sibling_of</code>).</li>
+<li><strong>C. Smaller</strong>: only the kinds that fields write, plus <code>related_to</code>.</li>
+</ul>
+<p><strong>Recommendation: B.</strong> Family ties are the one relation people always want and a relation note covers the rest. <em>Affects:</em> LNK.3, LNK.6, ENT.2.</p>
+
+<h3>Q5. Which exchange formats are required for 1.0?</h3>
+<p><strong>Context:</strong> The bundle is the only format needed to move a world between installs and is nearly free given the page file format. The Markdown folder and CSV are the formats most likely to be used day to day (editing in a local tool; filling a spreadsheet). Each added format is code to test and a surface to secure; wiki converters need the other tool's format studied first.</p>
+<ul>
+<li><strong>A. Bundle and single-page <code>.md</code> only.</strong></li>
+<li><strong>B. A plus Markdown folder import and CSV import/export</strong> (as in 4.1).</li>
+<li><strong>C. B plus converters for named tools</strong> (you name which; each needs its own research item).</li>
+</ul>
+<p><strong>Recommendation: B.</strong> It covers editing outside the site and bulk entry, which are the realistic needs, without third-party formats. <em>Affects:</em> OPS.6, DOC.4, test plan.</p>
+
+<h3>Q6. Who may import and who may export?</h3>
+<p><strong>Context:</strong> Import can create or change many pages at once (it is revertible as a batch). Export of everything a GM can see is a bulk copy of GM-only content; of everything public it is a scraping convenience.</p>
+<ul>
+<li><strong>A. Import: GM and admin; export: any signed-in user for what they can see; anonymous export off.</strong></li>
+<li><strong>B. Import: editors too</strong> (with the same validation, no visibility changes above their role).</li>
+<li><strong>C. Both admin only.</strong></li>
+</ul>
+<p><strong>Recommendation: A.</strong> Importing is a power tool, and export respects visibility, so no new secret can leave. Roles are still assignable per API key. <em>Affects:</em> OPS.6, AUTH.8 (permission list), SEC.</p>
+<p>(Smaller points decided here, not needing a card: one lead image per page; galleries are body media; export contains no history; rename rewrites referrers; dates and measures are free text. Say so if any should change.)</p>
+</main></body></html>
