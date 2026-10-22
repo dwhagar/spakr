@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integrity, parity and backup design - spakr</title><link rel="stylesheet" href="../plan/style.css"></head>
+<body><nav><a href="../plan/index.html">Plan</a><a href="index.html">Design</a><a href="database.html">Database</a><a href="../research/backups.html">RES.17 Backups</a><a href="../research/content-store-choice.html">RES.29 Content store</a></nav><main>
+<h1>Integrity, parity and backup design</h1>
+<p><em>Design thread, 2026-10-22. Settles RES.26 (parity), RES.27 (source of truth), RES.28 (checksums) and RES.30 (backup). Unblocks INT.1, INT.2, INT.3, INT.7, INT.9, BAK.1 and BAK.8. Builds on <a href="../research/content-store-choice.html">RES.29</a> (git is the source of truth for page content), <a href="../research/backups.html">RES.17</a> and RES.31 (redacted config in backups). Measurements: <code>poc/integrity_bench.py</code>, Ubuntu 24.04, 4 cores, par2cmdline 0.8.1, Python 3.12.</em></p>
+
+<h2>Summary</h2>
+<ol>
+<li><strong>Every stored thing has one class</strong>: source of truth (S), rebuildable (R) or disposable (D). Only S needs backup and a journal; R is rebuilt by a command; D is ignored. The full table is in section 1.</li>
+<li><strong>Hash: SHA-256 everywhere.</strong> On this machine it ran at 1,263 MB/s, faster than BLAKE2b (557 MB/s) and SHA3 (347 MB/s), it is the algorithm the database design and media directories already use, and it is checkable with stock <code>sha256sum</code>.</li>
+<li><strong>Parity: par2 on immutable files only</strong> (backup archives, git packs and bundles, media originals). Not zfec, not reedsolo, not filesystem-specific. 10% redundancy repaired three scattered damaged spots in a 100 MB file in 1.7 s.</li>
+<li><strong>MySQL-only data is journaled</strong> to hash-chained, fsynced files before commit, so accounts, settings and the audit log can be rebuilt without the last dump.</li>
+<li><strong>Backup = small core archive nightly + a content-addressed media pool that only ever receives new files.</strong> Media is incompressible, so it is never run through bzip2 or gzip. This departs from a literal "tar.bz2 of everything" and is Question Q1 below.</li>
+<li>Nine open questions only the owner can settle are in section 7, each with options and a recommendation.</li>
+</ol>
+
+<h2 id="s1">1. Classification of everything stored (RES.27)</h2>
+<p>Classes: <strong>S</strong> source of truth (losing it loses information; must be backed up, checksummed, and for MySQL-only data journaled), <strong>R</strong> rebuildable from S by a named command, <strong>D</strong> disposable. Table names are from the <a href="database.html">database design</a>.</p>
+<table>
+<tr><th>Item</th><th>Class</th><th>Why, and how it comes back</th></tr>
+<tr><td>Git content store (pages, front matter, history)</td><td>S</td><td>Everything about a page that is not derived lives in the page file (GIT.9). Recovery: parity repair, else restore the bundle.</td></tr>
+<tr><td>Media originals, <code>media/ab/cd/&lt;sha256&gt;/</code></td><td>S</td><td>Bytes are the identity: the directory name is the hash. Recovery: parity repair, else backup pool.</td></tr>
+<tr><td>Media metadata sidecar <code>meta.json</code> in each hash directory (new, see 1.1)</td><td>S</td><td>Holds what is not in the bytes: original name, uploader, reviewer, state, variant hashes. Lets the <code>media</code> table be rebuilt.</td></tr>
+<tr><td><code>user, role, user_role, role_permission, api_key, api_key_permission, invitation</code></td><td>S (MySQL only)</td><td>Cannot be derived from content. Journaled (INT.9), row-checksummed (INT.2), in every dump. Role and permission rows are seeded by migrations, so only changes made after seeding matter.</td></tr>
+<tr><td><code>config</code>, <code>html_allowlist</code>, <code>upload_policy</code>, <code>setting</code> (site settings), <code>relation_kind</code></td><td>S (MySQL only)</td><td>Admin choices and the fixed vocabularies. Journaled, row-checksummed.</td></tr>
+<tr><td><code>audit_log</code></td><td>S (MySQL only)</td><td>Append-only. Hash-chained (2.3), journaled.</td></tr>
+<tr><td><code>schema_migration</code> (Alembic history with file hashes)</td><td>S</td><td>Part of every dump; compared with the migration files at start-up.</td></tr>
+<tr><td><code>config.json</code></td><td>S (outside the database)</td><td>Backed up redacted (RES.31); secrets are re-entered on restore.</td></tr>
+<tr><td><code>page, page_alias, page_revision, page_setting, tag, page_tag, relation, page_link</code>, type tables</td><td>R from git</td><td><code>spakr reindex</code> (DB.3). <code>page_revision</code> needs the commit author mapped back to a user: see Q8.</td></tr>
+<tr><td><code>page_search</code>, render cache, ETags</td><td>R</td><td>Reindex / re-render.</td></tr>
+<tr><td><code>media, media_variant, page_media</code></td><td>R from originals + sidecars + pages</td><td><code>spakr media-rebuild</code> (INT.5). Variants are regenerated from originals.</td></tr>
+<tr><td>Media variants (<code>w1280</code>, thumbnails, posters)</td><td>R</td><td>Regenerated by queue tasks. Not backed up by default; hashes kept in <code>meta.json</code> so damage is still detectable.</td></tr>
+<tr><td><code>session, password_reset, email_change</code></td><td>D</td><td>Loss means people sign in or request a link again. They stay in the dump (free) but are not journaled.</td></tr>
+<tr><td><code>email_outbox</code></td><td>D (with care)</td><td>Unsent rows lost on a restore are re-requestable. Dumped, not journaled.</td></tr>
+<tr><td>Redis (queue, rate counters, caches)</td><td>D</td><td>Already decided in RES.17: every job has a database row and <code>requeue-stuck</code> re-enqueues.</td></tr>
+<tr><td>Manifests, parity files, journal checkpoints</td><td>R (but they are the means of repair)</td><td>Regenerated by <code>spakr verify --rehash</code>; a lost manifest is a warning, never silent trust.</td></tr>
+</table>
+
+<h3>1.1 Two structural consequences</h3>
+<ul>
+<li><strong>Media sidecar.</strong> The original bytes cannot say who uploaded them or whether a moderator approved them. A small <code>meta.json</code> written atomically next to the original (and rewritten on state changes) makes media rebuildable from <code>/data/media</code> alone. The MED items need to write it; the media state machine stays the same.</li>
+<li><strong>Stable user reference in git.</strong> Rebuilding <code>page_revision.author_id</code> from commit authors needs commits to carry an opaque, permanent user identifier (not an email), and the <code>user</code> table to store it (Q8).</li>
+</ul>
+
+<h2 id="s2">2. Checksum design (RES.28)</h2>
+<h3>2.1 Algorithm</h3>
+<table>
+<tr><th>Algorithm (100 MB, hashlib)</th><th>Time</th><th>Rate</th></tr>
+<tr><td>crc32 (not a hash; for reference)</td><td>31 ms</td><td>3,239 MB/s</td></tr>
+<tr><td><strong>SHA-256</strong></td><td>79 ms</td><td>1,263 MB/s</td></tr>
+<tr><td>BLAKE2b</td><td>180 ms</td><td>557 MB/s</td></tr>
+<tr><td>SHA-512</td><td>177 ms</td><td>566 MB/s</td></tr>
+<tr><td>SHA3-256</td><td>288 ms</td><td>347 MB/s</td></tr>
+</table>
+<p>SHA-256 wins here because the CPU has SHA instructions and OpenSSL uses them; on a CPU without them BLAKE2b would be faster, but that is not the deciding point. Decision: <strong>SHA-256 for every checksum</strong>, hex lower-case, 64 characters. Reasons: <code>media.sha256</code> and <code>api_key.key_hash</code> already use it; GNU <code>sha256sum</code> verifies it with no spakr code (useful in a disaster); one algorithm means one helper (INT.3). The algorithm name is stored in each manifest header so a later change is a version bump, not a flag day. <em>Rejected:</em> BLAKE2b (extra length and name variations for no gain on supported hardware), SHA-1/MD5 (not for new integrity records; git's own SHA-1 is untouched and is covered by <code>git fsck</code> plus the SHA-256 recorded in the index), CRC (detects accidents but is trivially forgeable).</p>
+<h3>2.2 Manifest format and location</h3>
+<p>The one place a manifest is really needed is where there is no content-addressing already: backups, parity sets and journal segments. Media originals self-verify by directory name; variant hashes live in <code>meta.json</code>; git is content-addressed and gets one SHA-256 per page in the index.</p>
+<ul>
+<li><strong>Disk format: <code>SHA256SUMS</code>-compatible text</strong>, one <code>hash  relative/path</code> per line, preceded by <code>#</code> comment lines (header: <code>spakr-manifest 1</code>, algorithm, creation time, software and schema version). Tested here: GNU <code>sha256sum -c</code> accepts the comments, and reports OK or FAILED per file with exit code 0 or 1.</li>
+<li><strong>Last line</strong> is <code># manifest-sha256 &lt;hash of every preceding line&gt;</code>, so a truncated or edited manifest is detected before it is trusted.</li>
+<li><strong>Backups additionally carry <code>manifest.json</code></strong> (BAK.4) with the richer record: component list, sizes, git tip, journal sequence, per-table digests. The <code>SHA256SUMS</code> beside it lists the archive, parity and <code>manifest.json</code> itself.</li>
+<li><strong>Location:</strong> next to what it describes (<code>/data/backups/&lt;name&gt;/</code>, <code>/data/parity/&lt;store&gt;/</code>, <code>/data/journal/&lt;day&gt;/</code>). Written to a temporary name, fsynced, renamed (INT.3).</li>
+<li><em>Rejected:</em> one global manifest of the whole of /data (a single point of failure, a lock hot-spot, and it must be rewritten on every upload); manifest only in MySQL (the database is what we are protecting).</li>
+</ul>
+<h3>2.3 Database checksums</h3>
+<ul>
+<li><strong>Migration records.</strong> <code>schema_migration</code> stores the SHA-256 of each migration file as applied. At start-up and in <code>spakr verify</code>, a mismatch refuses to run (INT.2). The integer DB schema version still counts up on every change.</li>
+<li><strong>Row hash on S-class tables.</strong> A <code>row_hash CHAR(64)</code> column holds SHA-256 over a canonical encoding of the row's other columns in a fixed order, each value prefixed with its length and NULL encoded distinctly, so <code>("ab","c")</code> and <code>("a","bc")</code> cannot collide. Computed by the data-access layer in Python in the same transaction as the write. It is unkeyed: it detects corruption and sloppy manual edits, not a determined attacker with write access (they can recompute it). <em>Rejected:</em> a MySQL stored generated column using <code>SHA2(CONCAT_WS(...))</code> (it would auto-maintain itself, but NULL, collation and number-format rules differ from the Python verifier and make cross-checking fragile); triggers (hidden logic, harder to test); relying on <code>CHECKSUM TABLE</code> (an internal value that changes with row format and server version; usable only as a same-server before/after comparison).</li>
+<li><strong>Table digest.</strong> SHA-256 over the row hashes ordered by primary key, recorded per S-class table in the backup manifest. After a restore it proves the table came back whole, without comparing row by row.</li>
+<li><strong>Audit hash chain.</strong> <code>audit_log.prev_hash</code> and <code>audit_log.hash</code> where <code>hash = SHA-256(prev_hash || canonical row)</code>. Inserts are serialised by one chain-head row locked with <code>SELECT ... FOR UPDATE</code>; audit volume is low (moderator and admin actions), so this costs nothing noticeable. A chain implemented in Python ran at 4.3 microseconds per row (100,000 rows in 432 ms), so verifying a million rows is a few seconds of CPU plus the read. A chain only proves tampering if its head is stored somewhere an attacker with database access cannot rewrite, so the head is also written into the journal, every backup manifest, and optionally signed (Q6).</li>
+<li><strong>Git.</strong> <code>page.content_sha256</code> (GIT.9) is compared with the working-tree file by the scheduled check; git's own object hashes are verified by <code>git fsck</code> (0.20 s for 5,000 pages in the RES.29 measurements). The backup manifest records the git tip SHA, and git's commit chain is itself a hash chain over page history.</li>
+</ul>
+<h3>2.4 Cost of scheduled verification</h3>
+<table>
+<tr><th>Check</th><th>Cost (measured or derived)</th><th>Cadence</th></tr>
+<tr><td>Manifests, journal chain, audit chain tail, migration hashes, row hashes changed since last run, <code>git fsck</code></td><td>Seconds</td><td>Daily (INT.11 light)</td></tr>
+<tr><td>Full table digests, whole audit chain</td><td>About 5 s per million rows plus the read</td><td>Weekly</td></tr>
+<tr><td>Re-hash media originals</td><td>79 ms per 100 MB of CPU; disk read is the limit (100 GB is a few minutes of CPU)</td><td>Weekly or monthly, rotating a slice per night is an option</td></tr>
+<tr><td><code>par2 verify</code></td><td>0.76 s per 100 MB (about 130 MB/s, one core); 100 GB is about 13 minutes</td><td>Monthly for media; with each backup for the archive</td></tr>
+</table>
+<p>Run at idle I/O class (<code>ionice -c3</code>, <code>nice</code>) from the systemd service; a full pass reads everything once.</p>
+
+<h2 id="s3">3. Parity (RES.26)</h2>
+<h3>3.1 Options measured</h3>
+<table>
+<tr><th>Option</th><th>Result</th><th>Verdict</th></tr>
+<tr><td><strong>par2cmdline</strong> (Ubuntu package <code>par2</code> 0.8.1)</td><td>100 MB file: create 1.9 s / 2.8 s / 4.8 s at 5% / 10% / 20%; parity 5.6 / 10.9 / 21.4 MB; verify 0.76 s. Three damaged 2 KB spots: repaired, byte-identical, 1.7 s at every level. 30 MB wiped (more than the redundancy): repair refused with exit code 2, file left unrepaired, no false success.</td><td><strong>Chosen.</strong> Mature, standard file format, self-verifying, verify and repair in one tool, in the Ubuntu archive.</td></tr>
+<tr><td>zfec (Python)</td><td>Encoding 100 MB at 10% took 0.07 s, far faster than par2.</td><td>Rejected: a library, not a tool. We would have to write the file format, block checksums, damage localisation and repair command ourselves, which is the part par2 already does and the part that goes wrong.</td></tr>
+<tr><td>reedsolo (pure Python)</td><td>About 2.6 s per MB, so about 260 s for 100 MB.</td><td>Rejected: 90 times slower than par2 for a video.</td></tr>
+<tr><td>Filesystem: ZFS or btrfs scrub with redundancy, dm-integrity, RAID</td><td>Not measured; needs root, a particular disk layout, and a second disk for self-healing.</td><td>Not required. Ubuntu installs on ext4 and the app cannot assume it. Documented in the admin guide as an optional extra layer that complements, not replaces, par2.</td></tr>
+</table>
+<p>Caveats from the run: par2 on 5,000 small files in one command exited with an error (code 3) in my invocation and I did not pursue it; parity for many tiny files is the wrong shape anyway. Parity for a 1 KB git pack cost about 36 KB (a fixed overhead per parity set), so tiny files should be grouped. The 30 MB case is a design limit, not a bug: parity covers bit rot and bad sectors, not a lost disk, which is what the backups are for.</p>
+<h3>3.2 What gets parity, when, where</h3>
+<table>
+<tr><th>Target</th><th>Parity set</th><th>When created</th><th>Stored</th></tr>
+<tr><td>Backup archive and media files in the backup (BAK.8)</td><td>One set per archive file</td><td>After the archive is written, before verify-after-write (BAK.9)</td><td>Beside the archive in <code>/data/backups/&lt;name&gt;/</code>, listed in the manifest</td></tr>
+<tr><td>Git content store (INT.7)</td><td>Per pack file once it is old enough to be stable; the daily bundle covers loose objects and young packs</td><td>After <code>git gc</code> / repack by a queue task; parity of a deleted pack is deleted</td><td><code>/data/parity/git/&lt;pack-sha&gt;.par2</code></td></tr>
+<tr><td>Media originals (INT.8)</td><td>One set per original</td><td>Queue task after upload is published; after replace</td><td><code>/data/parity/media/ab/cd/&lt;sha256&gt;.par2</code></td></tr>
+<tr><td>Journal segments</td><td>Sealed segment (one per day)</td><td>When sealed</td><td><code>/data/parity/journal/</code></td></tr>
+<tr><td>MySQL data files</td><td>None. The dump (with parity) and the journal are the recovery path; InnoDB pages are not static files.</td><td></td><td></td></tr>
+</table>
+<p>Git packs and media originals are immutable once written, so parity is created once and never refreshed, which is what makes it cheap. The gap is loose git objects and the newest pack: a window of at most one day, covered by the nightly bundle and the git mirror option from RES.17. <em>Not</em> covered by parity and said so honestly: files being written right now, the parity files themselves (a damaged parity set is detected by its own checksums and regenerated from healthy data), and anything on a failed disk.</p>
+<p><strong>Defaults:</strong> 10% redundancy for archives, packs and the journal, a configurable value for media (Q4). par2 is invoked with an argument list (never through a shell) and paths checked to be under <code>/data</code>. Parity is sensitive as the data it protects, so it is stored 0600 in 0700 directories. For encrypted off-host copies the order is encrypt first, then par2 the ciphertext, so parity never exists for plaintext outside the machine.</p>
+<h3>3.3 Recovery procedure</h3>
+<ol>
+<li><code>spakr verify</code> finds damage and names the files.</li>
+<li><code>spakr repair</code> (INT.13) runs <code>par2 repair</code> on the affected file, re-hashes it against the manifest or its hash directory name, and writes an audit entry.</li>
+<li>If par2 reports exit code 2 (too much damage), the file is quarantined and restored from the newest backup that contains it; for git, from the bundle, then <code>git fsck</code> and <code>reindex</code>.</li>
+<li>Derived data is then rebuilt (R-class), and a full <code>verify</code> confirms.</li>
+</ol>
+
+<h2 id="s4">4. The MySQL journal (shapes INT.9)</h2>
+<p>Why it exists: without it the recovery point for accounts, keys, settings and audit is the last dump, up to 24 hours. With it the database can be rebuilt to the last committed change without MySQL's help.</p>
+<ul>
+<li><strong>Format:</strong> JSON Lines in <code>/data/journal/YYYY/MM/DD.jsonl</code>, 0600. Each line: sequence number, time, table, operation (insert, update, delete), primary key, the full row after the change (password hashes included, key material only as hashes, never session tokens), <code>prev_hash</code>, <code>hash</code>. The chain runs across files.</li>
+<li><strong>Write order (write-ahead):</strong> append and fsync an <em>intent</em> line, commit the MySQL transaction, append a <em>commit</em> line. Replay applies only intents that have a commit line or whose row is found in the database. S-class changes are rare (account and admin actions), so the fsync cost is irrelevant. Every dump records the last journal sequence read inside its snapshot, so replay knows where to start.</li>
+<li><strong>Sealing and compaction:</strong> a finished day is sealed (final hash recorded, parity created, listed in a manifest). A compaction task can fold old days into a snapshot file of current rows plus the chain head; originals are kept for the retention period.</li>
+<li><em>Rejected:</em> MySQL binary log (needs extra privileges and configuration, ties recovery to the server version, not portable); relying on the nightly dump alone (see Q3); triggers writing a journal table (lives in the database being protected).</li>
+</ul>
+
+<h2 id="s5">5. Backup design (RES.30)</h2>
+<h3>5.1 Contents and layout</h3>
+<pre>/data/backups/
+  spakr-20261022T030000Z-v0.1.42/        one directory per backup, 0700
+    manifest.json                         versions, git tip, journal seq, per-table digests, file list
+    SHA256SUMS                            archive, parity, manifest.json
+    core.tar[.bz2|.gz]  (+ .par2 set)     database dump, git bundle, journal, redacted config
+    media-index.json                      hash, size and path of every original this backup needs
+  media-pool/ab/cd/&lt;sha256&gt;/original (+ .par2)   shared across backups, only new files are added</pre>
+<p>Name: <code>spakr-YYYYMMDDTHHMMSSZ-vVERSION</code> (as in BAK.7), written under a temporary name and renamed when verified; a failed one is renamed <code>.failed</code>.</p>
+<h3>5.2 Consistent snapshot without stopping the site</h3>
+<ol>
+<li>Take the backup lock (one at a time) and, for milliseconds, the git write lock; create a temporary ref <code>refs/backup/&lt;ts&gt;</code> at the tip; release the git lock. Git objects are append-only, so the bundle can be built afterwards from that ref (<code>git bundle create ... refs/backup/&lt;ts&gt;</code>), then the ref is deleted. Page saves are blocked for a moment, not for the length of the backup.</li>
+<li><code>mysqldump --single-transaction --routines --triggers --events --hex-blob</code>: a consistent InnoDB snapshot without blocking writers. The last journal sequence is read inside that same transaction. Credentials come from a 0600 option file, never the command line.</li>
+<li>Copy the journal up to that sequence.</li>
+<li>Reconcile skew by design rather than by locking: S-class tables are self-consistent inside the dump; the derived page index may be a save ahead of or behind the bundle, and the restore ends with <code>reindex</code> (DB.3), which makes git win. Locking the whole site for the dump would buy nothing.</li>
+<li>Add the redacted config (RES.31), write the manifest and checksums, compress, create parity, verify (BAK.9), then rename into place.</li>
+</ol>
+<h3>5.3 Compression: bz2 versus gz, and what to compress</h3>
+<p>Measured on a synthetic corpus: 5,000 Markdown pages (13 MB of random dictionary words, so real prose will differ somewhat), a 21 MB SQL dump of 200,000 audit-style rows, and 100 MB of random bytes standing in for already-compressed video and images.</p>
+<table>
+<tr><th>Data</th><th>gzip -6</th><th>bzip2 -9</th><th>pbzip2 (4 cores)</th><th>zstd -3</th></tr>
+<tr><td>Pages (13 MB)</td><td>38.5% in 1.7 s</td><td><strong>28.7% in 1.0 s</strong></td><td>28.8% in 0.37 s</td><td>40.9% in 0.12 s</td></tr>
+<tr><td>SQL dump (21 MB)</td><td>5.5% in 0.21 s</td><td><strong>3.0%</strong> in 1.4 s</td><td>3.0% in 0.40 s</td><td>1.5% in 0.03 s</td></tr>
+<tr><td>Media (105 MB)</td><td>100.0% in 3.8 s</td><td>100.4% in 13.3 s</td><td>100.4% in 3.5 s</td><td>100.0% in 0.38 s</td></tr>
+</table>
+<ul>
+<li><strong>bz2 does give the smaller file for text and SQL</strong> (about a quarter smaller than gz on pages, roughly half the size on SQL) and, in single-threaded form, was no slower than gzip on text, so the owner's default of bz2 is sound for the compressible parts. <code>pbzip2</code> (Ubuntu package) is 2.7 to 3.8 times faster on four cores and writes standard bz2, so any <code>bzip2</code> or <code>tar xjf</code> can read it; it is an optional speed-up used if installed.</li>
+<li><strong>Media does not compress at all</strong> and bzip2 spent 13 s per 100 MB discovering that. Compressing media is wasted CPU and, worse, destroys the cheap incremental copy.</li>
+<li>zstd is faster and smaller than gz, but the owner chose bz2 and gz; it stays a rejected-for-now option so there is one fewer package and format to restore with in an emergency (Q2 lists it).</li>
+<li>A git bundle is already zlib-compressed packs; recompressing it saves little, so the setting applies to the dump, journal and config members.</li>
+</ul>
+<h3>5.4 Media: full nightly or incremental</h3>
+<p>Originals are immutable and named by hash, so "which files does this backup need" is a list of hashes. Copying every original into every nightly archive makes the cost grow with media size times retention: with 20 GB of media and the default 7 daily + 4 weekly + 6 monthly (17 backups) that is 340 GB and over a minute of tar I/O per 10 GB each night. <strong>Recommendation: the media pool.</strong> Each night, originals not yet in <code>media-pool/</code> are copied in (with their parity), the backup's <code>media-index.json</code> records the hashes it needs, and retention deletes a pool file only when no retained backup lists it. Restore of any backup reads exactly the originals in its index. Variants are excluded by default (R-class), with a setting to include them. Verification re-hashes pool files against their directory names, so no extra manifest is needed. The trade-off is that a backup is no longer one self-contained file: moving it off-host means copying the directory plus the pool objects it references, and the off-host hook (BAK.17) gets a list of paths rather than one archive. This is Q1.</p>
+<h3>5.5 Parity defaults</h3>
+<p>10% redundancy for the core archive is cheap (a few seconds even for large archives) and repairs scattered damage. For media the same percentage is 10 GB of parity per 100 GB, which is a real cost; scattered bit rot needs far less than 10% (Q4). par2 needs the <code>par2</code> package; BAK.8 gives a clear error when it is missing, and the install guide lists <code>par2 pbzip2 rsync</code> as packages (rsync only if the pool copy uses it; plain Python copy with hash check is the alternative).</p>
+<h3>5.6 Retention</h3>
+<p>Defaults as in RES.17: 7 daily, 4 weekly, 6 monthly, all settings (BAK.15). Rules: delete only after a newer backup has verified; never delete the last verified backup; a backup's parity and media-index go with it; pool files are reference-counted by retained indexes. Retention also defines how long erased accounts persist in backups (privacy statement, RES.17). Local retention is no protection against losing the machine; the off-host hook is where that protection comes from (Q5).</p>
+<h3>5.7 Restore order</h3>
+<ol>
+<li>Verify <code>SHA256SUMS</code>, then <code>par2 verify</code>; repair if needed. Refuse a backup whose schema version is newer than the software.</li>
+<li>Create an empty target; prompt for the secrets removed from the redacted config; write <code>config.json</code> (0600).</li>
+<li>Load the MySQL dump. Compare per-table digests with the manifest.</li>
+<li>Replay journal entries after the dump's sequence (only present if /data survived or the journal was in the backup; the backup always contains the journal up to its cut).</li>
+<li>Run any newer migrations (checked against migration hashes).</li>
+<li>Clone the bundle into the content store; <code>git fsck</code>; confirm the tip equals the manifest's.</li>
+<li>Restore media from the pool; check each original against its directory name; recreate parity if absent.</li>
+<li><code>reindex</code> (DB.3), <code>media-rebuild</code> (INT.5), <code>requeue-stuck</code>, then a full <code>spakr verify</code>. The report is the proof the restore worked; the daily CI job repeats the cycle on sample content.</li>
+</ol>
+
+<h2 id="s6">6. What this unblocks and the changes to TODO items</h2>
+<table>
+<tr><th>Item</th><th>What this document gives it</th></tr>
+<tr><td>INT.1</td><td>The classification table (section 1), checksum rules (section 2), recovery path per class (3.3, 5.7). It can now be written as <code>docs/design/integrity.html</code> or simply by pointing at this page; see Q9.</td></tr>
+<tr><td>INT.2</td><td>Row hash encoding, migration file hash, audit chain with anchored head.</td></tr>
+<tr><td>INT.3</td><td>Manifest format (<code>SHA256SUMS</code> plus self-hash line), atomic write, <code>sha256sum</code> compatibility.</td></tr>
+<tr><td>INT.7</td><td>par2 per stable pack, parity under <code>/data/parity/git</code>, bundle covers the gap.</td></tr>
+<tr><td>INT.8</td><td>par2 per original, sidecar location, redundancy setting.</td></tr>
+<tr><td>INT.9</td><td>Journal format and write-ahead order (section 4).</td></tr>
+<tr><td>BAK.1, BAK.4, BAK.7, BAK.8, BAK.10, BAK.14, BAK.15</td><td>Layout and naming, manifest contents, snapshot procedure and lock scope, media pool, retention rules, par2 defaults.</td></tr>
+<tr><td>New work implied</td><td>Media <code>meta.json</code> sidecar (MED), <code>user</code> public id for git authors (AUTH, GIT), <code>row_hash</code> and chain columns (INT.2), <code>journal</code> state read in dump (INT.9), media-pool GC (BAK.14, BAK.15), <code>par2 pbzip2</code> in packaging notes (OPS). The TODO thread should add these as items once the questions are answered.</td></tr>
+</table>
+
+<h2 id="s7">7. Open questions for the owner</h2>
+<p>Each is written to become a decision card: context, options, and the recommendation.</p>
+
+<h3>Q1. Is a backup one self-contained file, or a small core archive plus a shared media pool?</h3>
+<p><strong>Context.</strong> The earlier decision was nightly tar.bz2 of all data with a parity file. Media (videos up to 100 MB, images) does not compress, so bzip2 spends about 13 s per 100 MB for 0% gain, and storing every original in every one of 17 retained backups multiplies disk use by 17 (20 GB of media becomes 340 GB).</p>
+<ul>
+<li><strong>A. One archive, everything inside, compressed.</strong> Simplest to move and restore; media copied in full every night; large and slow once media grows.</li>
+<li><strong>B. Core archive nightly (database, git bundle, journal, config) plus a content-addressed media pool that only receives new files. (Recommended.)</strong> Fast nightly runs, disk use equals the media you actually have plus the core archives; a backup is a directory and the pool, not one file.</li>
+<li><strong>C. One archive per backup but media stored uncompressed inside it and de-duplicated by hard links.</strong> Keeps "one file", but hard links do not survive copying off-host or onto another filesystem.</li>
+</ul>
+<p><strong>Recommendation: B</strong>, because it is the only option whose cost does not scale with retention, and it matches how the media directories already work.</p>
+
+<h3>Q2. Which compression for the compressible parts?</h3>
+<p><strong>Context.</strong> bz2 produced the smallest output for text and SQL; gz is the faster, more widely available fallback; zstd is faster and smaller than gz but not in the owner's list.</p>
+<ul>
+<li><strong>A. bz2 default, gz option, pbzip2 used automatically if installed. (Recommended.)</strong> As decided; nothing new to learn.</li>
+<li><strong>B. Add zstd as a third option.</strong> Fastest and good ratio; one more format and package to hold in an emergency.</li>
+<li><strong>C. bz2 and gz only, no pbzip2.</strong> Fewest dependencies; slower on big dumps.</li>
+</ul>
+<p><strong>Recommendation: A.</strong> Keep zstd off until there is a measured need.</p>
+
+<h3>Q3. How much recent change may be lost on a total database loss?</h3>
+<p><strong>Context.</strong> The journal (section 4) gives near-zero loss for accounts, keys, settings and audit, at the cost of a write-ahead file layer and a replay command. Without it, the loss is up to a day (the nightly dump), the same as every other website of this size.</p>
+<ul>
+<li><strong>A. Build the journal (INT.9 as planned). (Recommended.)</strong> Matches the "from the ground up" principle; it is the only way to rebuild MySQL-only data between dumps.</li>
+<li><strong>B. Skip the journal, rely on the nightly dump, and offer a second dump option (for example every 6 hours) for the S-class tables only.</strong> Much less code; up to six hours of account changes can be lost.</li>
+<li><strong>C. Journal in 1.0 but defer replay tooling.</strong> Writes happen from the start (cheap to add early, expensive to retrofit), restore is manual.</li>
+</ul>
+<p><strong>Recommendation: A.</strong> If the schedule gets tight, C is the fallback.</p>
+
+<h3>Q4. How much parity for media originals?</h3>
+<p><strong>Context.</strong> par2 cost scales with redundancy: 5% parity took 1.9 s and 5.6 MB per 100 MB, 10% took 2.8 s and 10.9 MB, 20% took 4.8 s and 21.4 MB. Scattered bit rot needs very little; parity does not help against a dead disk.</p>
+<ul>
+<li><strong>A. 10% everywhere, one setting.</strong> Simple, consistent with BAK.8; media parity doubles the space cost of 5%.</li>
+<li><strong>B. 10% for archives, packs and journal; 5% for media originals, separate setting. (Recommended.)</strong></li>
+<li><strong>C. Parity for media only in the backup pool, none beside the live originals.</strong> Halves disk use; live files are only repairable from the backup copy.</li>
+</ul>
+<p><strong>Recommendation: B.</strong></p>
+
+<h3>Q5. Is local-only backup acceptable for the first releases?</h3>
+<p><strong>Context.</strong> Everything above lives in <code>/data</code> on the same machine. It protects against bit rot, deletion and bad upgrades, not against losing the disk or the server. The off-host hook (BAK.17) only runs a command the admin configures.</p>
+<ul>
+<li><strong>A. Yes, with a loud notice in the admin screen and install guide until an off-host command is set. (Recommended.)</strong></li>
+<li><strong>B. Ship a documented default off-host command (restic over SFTP) the installer offers to configure.</strong> More setup work now.</li>
+<li><strong>C. Refuse to call the backup healthy until an off-host copy has succeeded once.</strong> Strongest, but the status would be red on every fresh install.</li>
+</ul>
+<p><strong>Recommendation: A.</strong> Revisit B at 0.9 when the install guide is written.</p>
+
+<h3>Q6. Should the audit chain head be signed or only anchored?</h3>
+<p><strong>Context.</strong> A hash chain only proves tampering if the head cannot be rewritten along with the rows. Anchoring the head in the journal and every backup manifest catches edits made after a backup. An HMAC with a key from <code>config.json</code> would also catch an attacker who has database access but not the config file, but adds a key that must be kept and rotated.</p>
+<ul>
+<li><strong>A. Anchor in journal and backup manifests, no key. (Recommended.)</strong></li>
+<li><strong>B. Anchor plus HMAC with the existing application secret.</strong> Stronger; losing the config makes older checkpoints unverifiable until the secret is re-entered.</li>
+<li><strong>C. Skip the chain, rely on an append-only table.</strong> No tamper evidence.</li>
+</ul>
+<p><strong>Recommendation: A</strong> for 1.0; B can be added later without a format break because the checkpoint record has a version field.</p>
+
+<h3>Q7. How often should the full media check run?</h3>
+<p><strong>Context.</strong> Re-hashing is cheap in CPU (79 ms per 100 MB) but reads every byte; <code>par2 verify</code> reads it again (0.76 s per 100 MB).</p>
+<ul>
+<li><strong>A. Daily light check; weekly hash of a rotating one-seventh slice of media; monthly par2 verify of everything. (Recommended.)</strong> Every file is re-read at least weekly with a bounded nightly load.</li>
+<li><strong>B. Weekly full hash plus monthly par2.</strong> Simple; one heavy night a week.</li>
+<li><strong>C. Admin-triggered only.</strong> Nothing scheduled; rot is found late.</li>
+</ul>
+<p><strong>Recommendation: A.</strong> All values are settings.</p>
+
+<h3>Q8. May git commits carry an opaque permanent user identifier?</h3>
+<p><strong>Context.</strong> To rebuild <code>page_revision.author_id</code> from git alone, each commit author must map back to a user. Using emails would leak them to anyone with a clone and could not be erased. An opaque id such as <code>u-7f3a9c</code>, stored in <code>user.public_id</code> and used as the git author name with a placeholder domain, solves both and keeps erasure possible (clear the user row; the id means nothing). This touches the content model, which the sibling "content model and exchange" thread is deciding, so it should be settled once, there.</p>
+<ul>
+<li><strong>A. Yes, opaque stable id in the commit author. (Recommended.)</strong></li>
+<li><strong>B. Author is the display name at commit time.</strong> Readable history, but renames and duplicates break the mapping.</li>
+<li><strong>C. No author in git; authorship only in MySQL.</strong> Authorship is then not rebuildable and history loses attribution after a database loss.</li>
+</ul>
+<p><strong>Recommendation: A.</strong></p>
+
+<h3>Q9. Where do the final integrity and backup specifications live?</h3>
+<p><strong>Context.</strong> TODO items INT.1 and BAK.1 say to record their designs as <code>docs/design/integrity.html</code> and <code>docs/design/backups.html</code>. This page covers both at once.</p>
+<ul>
+<li><strong>A. Keep this single page as the specification; mark INT.1 and BAK.1 done by pointing at it, and update the item text. (Recommended.)</strong> One place to keep correct.</li>
+<li><strong>B. Split into two pages when the questions are settled.</strong> Matches the item text; some duplication of the checksum and parity sections.</li>
+</ul>
+<p><strong>Recommendation: A.</strong></p>
+
+<h2>8. What I could not verify</h2>
+<ul>
+<li><code>mysqldump --single-transaction</code>, the journal write-ahead order and the MySQL-side parts were not run: there is no MySQL server in this environment. They follow documented MySQL behaviour and are re-checked when DB and BAK items are built.</li>
+<li>The compression corpus is synthetic; ratios on real prose and real video will differ in absolute terms, though the ordering (bz2 smaller than gz on text, nothing on media) is reliable.</li>
+<li>par2 numbers are from a 100 MB file of random data on four cores; repair time on a real disk with cold cache will be dominated by reads.</li>
+<li>Multi-gigabyte par2 behaviour (block-count limits, memory use) was not tested.</li>
+<li>Filesystem-level protection (ZFS, btrfs, dm-integrity) was only reviewed, not run.</li>
+</ul>
+<p>Reproduce the measurements with <code>python3 docs/design/poc/integrity_bench.py</code>.</p>
+</main></body></html>
