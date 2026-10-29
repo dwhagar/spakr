@@ -152,8 +152,8 @@ Issue: [#18](https://github.com/dwhagar/spakr/issues/18)
 - [ ] **VIS.5** Rendered-page cache keeps separate public and GM variants, never serving a GM variant to a non-GM viewer [0.4] — needs: VIS.4, RND.5
 - [ ] **VIS.6** Search: GM-section text indexed in a GM-only column and never in public snippets, results or highlights [0.6] — needs: VIS.4, SEARCH.2
 - [ ] **VIS.7** History, diff, revert, preview and export hide GM sections from non-GM viewers (diffs show the section as removed or changed without its text) [0.6] — needs: VIS.4, GIT.3, GIT.4
-- [ ] **VIS.8** Editing a page with GM sections as a non-GM editor: they never see the sections and saving keeps them intact (merge back on write) [0.6] — needs: VIS.4, UI.24
-- [ ] **VIS.9** Leak tests for GM sections: views, search snippets, caches, history, diff, preview, export, API and feeds [0.6] — needs: VIS.5, VIS.6, VIS.7, VIS.8
+- [ ] **VIS.8** Editing a page with GM sections as a non-GM editor: they never see the sections and saving keeps them intact (merge back on write) [0.8] — needs: VIS.4, UI.24
+- [ ] **VIS.9** Leak tests for GM sections: views, search snippets, caches, history, diff, preview, export, API and feeds [0.8] — needs: VIS.5, VIS.6, VIS.7, VIS.8
 
 ## ENT: Entity types
 
