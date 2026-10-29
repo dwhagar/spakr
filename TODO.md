@@ -368,7 +368,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.12** Single-page Markdown import and export [0.9] — needs: ENT.18, GIT.2
 - [ ] **OPS.13** CSV export and import of typed fields [0.9] — needs: ENT.1, OPS.11
 - [ ] **OPS.14** Markdown folder import with field mapping [0.9] — needs: OPS.11
-- [ ] **OPS.15** Import and export permissions, size limits, audit entries and the safe-zip test suite [0.9] — needs: OPS.11, AUTH.8
+- [ ] **OPS.15** Import and export permissions (admin only for both, owner decision 2026-10-29; assignable to API keys of admins), size limits, audit entries and the safe-zip test suite [0.9] — needs: OPS.11, AUTH.8
 - [ ] **OPS.16** Revert a whole import as one operation [0.9] — needs: OPS.11, GIT.4
 - [ ] **OPS.17** Packaging notes: par2 required, pbzip2 used if installed [0.9] — needs: BAK.8
 
