@@ -99,7 +99,7 @@ Issue: [#14](https://github.com/dwhagar/spakr/issues/14)
 - [ ] **GIT.5** MySQL page index kept in step on every write [0.2] — needs: GIT.2, DB.2
 - [ ] **GIT.6** Slug rules, rename and move [0.2] — needs: GIT.2
 - [ ] **GIT.7** Edit conflict detection based on the base commit [0.2] — needs: GIT.2
-- [ ] **GIT.9** Complete front matter: the page file carries everything about a page that is not derived (typed fields, tags, settings, visibility, aliases, relations), so the MySQL index can be rebuilt from git alone; page.content_sha256 records the file hash for INT.4 (RES.29) [0.2] — needs: GIT.2, RES.13, RES.29
+- [ ] **GIT.9** Complete front matter: the page file carries everything about a page that is not derived (typed fields, tags, settings, visibility, aliases, relations), so the MySQL index can be rebuilt from git alone; page.content_sha256 records the file hash for INT.4 (RES.29) [0.2] — needs: GIT.2, RES.13, RES.29 — progress: GM-only body sections are part of the body, not front matter; see VIS.4
 - [ ] **GIT.10** Delete and restore a page: deletion is a commit, deleted pages disappear from lists, search and links, moderators can restore, admins can purge permanently [0.2] — needs: GIT.2, GIT.5
 - [ ] **GIT.11** Commit identity: author and committer are the opaque user public id (u-xxxxxxxxxx, placeholder .invalid email), trailers for reverts, imports and renames; u-system for system actions [0.2] — needs: GIT.2, AUTH.13
 
@@ -148,6 +148,12 @@ Issue: [#18](https://github.com/dwhagar/spakr/issues/18)
 - [ ] **VIS.1** Public or GM-only flag per page, with the reserved visibility-group column [0.4] — needs: DB.2, GIT.2, AUTH.3
 - [ ] **VIS.2** One central query filter enforcing visibility everywhere [0.4] — needs: VIS.1, DB.1
 - [ ] **VIS.3** Leak tests: views, search, links, backlinks, history and downloads [0.6] — needs: VIS.2, SEARCH.3, LNK.2, GIT.3
+- [ ] **VIS.4** GM-only sections inside a page: one fenced block syntax in the body, one function that splits a page into public and GM parts, used by every path below (owner decision 2026-10-29) [0.4] — needs: VIS.2, RND.1
+- [ ] **VIS.5** Rendered-page cache keeps separate public and GM variants, never serving a GM variant to a non-GM viewer [0.4] — needs: VIS.4, RND.5
+- [ ] **VIS.6** Search: GM-section text indexed in a GM-only column and never in public snippets, results or highlights [0.6] — needs: VIS.4, SEARCH.2
+- [ ] **VIS.7** History, diff, revert, preview and export hide GM sections from non-GM viewers (diffs show the section as removed or changed without its text) [0.6] — needs: VIS.4, GIT.3, GIT.4
+- [ ] **VIS.8** Editing a page with GM sections as a non-GM editor: they never see the sections and saving keeps them intact (merge back on write) [0.6] — needs: VIS.4, UI.24
+- [ ] **VIS.9** Leak tests for GM sections: views, search snippets, caches, history, diff, preview, export, API and feeds [0.6] — needs: VIS.5, VIS.6, VIS.7, VIS.8
 
 ## ENT: Entity types
 
@@ -191,7 +197,7 @@ Issue: [#20](https://github.com/dwhagar/spakr/issues/20)
 Issue: [#21](https://github.com/dwhagar/spakr/issues/21)
 
 - [x] **SEARCH.1** Reconcile the page_search design in docs/design/database.html (type, summary, name/aliases, tags, settings, field text, indexes) [0.0]
-- [ ] **SEARCH.2** Search document builder: plain text of the Markdown plus title, summary, aliases, tags, settings and type-field text (with split and joined token forms: 8d6 also d6, Mi-Go also migo), written on every page save [0.2] — needs: GIT.5, DB.2, SEARCH.1
+- [ ] **SEARCH.2** Search document builder: plain text of the Markdown plus title, summary, aliases, tags, settings and type-field text (with split and joined token forms: 8d6 also d6, Mi-Go also migo), written on every page save [0.2] — needs: GIT.5, DB.2, SEARCH.1 — progress: GM-section text goes to a separate GM-only field (VIS.6)
 - [ ] **SEARCH.3** Full-text query endpoint over the full page index: natural and boolean modes, relevance ranking, highlighted snippets, pagination [0.6] — needs: SEARCH.2, VIS.2, RES.7
 - [ ] **SEARCH.4** Field search: type, setting, tag, name/title and type-specific fields (for example race, place, occupation) as API parameters and query syntax such as type:character setting:scifi tag:undead [0.6] — needs: SEARCH.3, ENT.1, LNK.5
 - [ ] **SEARCH.5** Filters and facet counts by type, setting and tag [0.6] — needs: SEARCH.4
@@ -353,7 +359,7 @@ Issue: [#24](https://github.com/dwhagar/spakr/issues/24)
 - [ ] **OPS.3** Error pages [0.9] — needs: UI.2
 - [ ] **OPS.4** Accessibility pass [0.9] — needs: UI.8, UI.21, RES.18, UI.13
 - [ ] **OPS.5** Backup acceptance on a clean install: the latest nightly backup, with parity, restores into a fresh server and matches the original (delivered by the BAK category) [0.9] — needs: BAK.12, BAK.13, BAK.14, BAK.26
-- [ ] **OPS.6** Native bundle export: zip of page files byte-identical to git, manifest, no history, visibility-aware, queue task and download [0.9] — needs: GIT.2, ENT.1, RES.19
+- [ ] **OPS.6** Native bundle export: zip of page files byte-identical to git, manifest, no history, visibility-aware (page flag and GM sections, VIS.4), queue task and download [0.9] — needs: GIT.2, ENT.1, RES.19
 - [ ] **OPS.7** Clean-install test on Ubuntu 24.04; best-effort pass on 26.04 [0.9] — needs: DOC.3, OPS.5
 - [ ] **OPS.8** `spakr upgrade` and maintenance mode: takes a verified backup, runs migrations, verifies, reports how to roll back; a maintenance page while it runs [0.8] — needs: BAK.11, DB.2, FND.9
 - [ ] **OPS.9** Log rotation example and monitoring notes (health endpoint, backup age, integrity state, queue length) in examples/ and the admin guide [0.2] — needs: FND.8, FND.6
