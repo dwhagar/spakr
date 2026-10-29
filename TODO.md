@@ -153,7 +153,7 @@ Issue: [#18](https://github.com/dwhagar/spakr/issues/18)
 
 Issue: [#19](https://github.com/dwhagar/spakr/issues/19)
 
-- [ ] **ENT.1** Entity type registry and structured field definitions [0.5] — needs: GIT.2, DB.2, RES.13 — progress: registry is one YAML file per type, docs/design/content-model-and-exchange.html; owner card on fixed versus admin-defined fields
+- [ ] **ENT.1** Entity type registry and structured field definitions [0.5] — needs: GIT.2, DB.2, RES.13 — progress: registry is one YAML file per type, docs/design/content-model-and-exchange.html; owner decision 2026-10-29: admins add, retire and order fields on existing types (field kinds from the design only); page types stay fixed
 - [ ] **ENT.2** Characters [0.5] — needs: ENT.1
 - [ ] **ENT.3** Items and technology [0.5] — needs: ENT.1
 - [ ] **ENT.4** Places [0.5] — needs: ENT.1
@@ -165,13 +165,14 @@ Issue: [#19](https://github.com/dwhagar/spakr/issues/19)
 - [ ] **ENT.10** Nation-states [0.5] — needs: ENT.1
 - [ ] **ENT.11** Free pages [0.5] — needs: ENT.1
 - [ ] **ENT.12** Settings as tags (high fantasy, modern/cosmic horror, scifi) [0.5] — needs: ENT.1
-- [ ] **ENT.13** Per-type form schemas served by the API for the UI to render [0.5] — needs: ENT.1, API.5
+- [ ] **ENT.13** Per-type form schemas served by the API for the UI to render [0.5] — needs: ENT.1, API.5 — progress: form schema includes admin-added fields
 - [ ] **ENT.14** Infobox: the typed fields of a page render as a labelled box beside the page text (stacked above it on narrow screens), formatted per field type; the page text stays separate from the fields [0.5] — needs: ENT.1, GIT.9, RND.1
 - [ ] **ENT.15** Infobox lead image: an image field refers to a media id with alt text and a placeholder when missing, respecting media visibility and takedown [0.7] — needs: ENT.14, MED.7, MED.11
 - [ ] **ENT.16** Static pages (WordPress-style): home, about, rules and privacy as editable free pages with an optional place in the site menu, reserved slugs and edit rights by role [0.6] — needs: ENT.11, UX.16
 - [ ] **ENT.17** Browse-with-filters benchmark of the page_field table at 20,000 pages, deciding whether the per-type tables stay out of the plan (fallback: type tables or generated columns) [0.5] — needs: ENT.1, DB.2
 - [ ] **ENT.18** Hardened front matter loader and writer: YAML 1.1 traps (no, 0750, dates), no anchors or tags, size and depth caps, duplicate keys rejected, fixed key order, round-trip tests [0.2] — needs: GIT.2
 - [ ] **ENT.19** Vocabulary tables and admin API (choice_set, choice_value) with seeds from the content-model design [0.5] — needs: DB.2, AUTH.8
+- [ ] **ENT.20** Admin field management: add, retire and reorder fields on existing page types from the registry (kinds from the design only; admin-added fields stored as data, never deleted, only retired), validation of changes, and `spakr rebuild-index` after a change [0.5] — needs: ENT.1, ENT.19, AUTH.8
 
 ## LNK: Links, relations and browsing
 
@@ -247,7 +248,7 @@ Issue: [#23](https://github.com/dwhagar/spakr/issues/23)
 - [ ] **UI.4** Page editor with preview: textarea, small toolbar and server-rendered preview (CodeMirror only after 1.0, needs a CSP nonce) [0.8] — needs: UI.2, UI.13, RND.6, GIT.7
 - [ ] **UI.5** History, diff and revert screens [0.8] — needs: UI.2, UI.13, GIT.4
 - [ ] **UI.6** Browse and search screens [0.8] — needs: UI.2, UI.13, SEARCH.5, LNK.4
-- [ ] **UI.7** Admin screens: allowlist, users, API keys [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6
+- [ ] **UI.7** Admin screens: allowlist, users, API keys, page-type fields [0.8] — needs: UI.3, UI.13, AUTH.6, AUTH.8, AUTH.9, LNK.6, ENT.20
 - [ ] **UI.8** Upload and media screens [0.8] — needs: UI.2, UI.13, MED.7
 - [ ] **UI.9** Licence notice on edit and upload pages (the footer licence is UX.7) [0.8] — needs: UI.2, UI.13, UX.7
 - [ ] **UI.10** Home page, navigation and recent-changes screen [0.8] — needs: UI.2, UI.13, LNK.7
@@ -442,7 +443,7 @@ Issue: [#54](https://github.com/dwhagar/spakr/issues/54)
 
 Owner decision: nightly backups of all data stored in /data/backups, each with a parity file; tar.bz2 by default, gz as an option. Built on the INT category (checksums, manifests, parity) and ordered so the basics (settings, layout, manifest, DB dump, config policy, restore) land first.
 
-- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1 — progress: written as docs/design/integrity-backup.html; done when owner cards Q1 to Q3 are answered
+- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1 — progress: written as docs/design/integrity-backup.html; owner decision 2026-10-29: core archive plus content-addressed media pool; done when the journal card is answered
 - [ ] **BAK.2** Backup settings in config.json.example and the settings registry: enabled, directory (default /data/backups), format bz2 (default) or gz, parity redundancy percent, retention, off-host command, alert on failure, stale-after hours; validated [0.1] — needs: CFG.1, CFG.2, BAK.1
 - [ ] **BAK.3** Directory layout and permissions: /data/backups created at startup, directory 0700 and files 0600 owned by the dedicated user; refuses to run when the path is world-readable or under a web-served path [0.1] — needs: FND.11, BAK.1
 - [ ] **BAK.4** Backup manifest on the INT.3 helper: manifest.json per backup with name, time, software, API and schema versions, format, component list, SHA-256 and size per file, written atomically [0.1] — needs: INT.3, BAK.1
