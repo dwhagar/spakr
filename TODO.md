@@ -426,7 +426,7 @@ Issue: [#51](https://github.com/dwhagar/spakr/issues/51)
 
 Principle (owner decision): the system is built from the ground up with checksums and parity data so a damaged database or store can be detected and rebuilt. Every stored artifact has a checksum, every artifact is classed as source of truth or rebuildable (INT.1), and every class has a tested recovery path.
 
-- [ ] **INT.1** Integrity principle and data classification recorded in docs/design/integrity.html: source of truth versus rebuildable for every table and file, checksum rules, recovery path per class; DB, GIT and MED items conform to it [0.1] — needs: RES.26, RES.27, RES.28 — progress: written as docs/design/integrity-backup.html, which stands in for integrity.html unless split; done when its owner cards are answered
+- [x] **INT.1** Integrity principle and data classification recorded in docs/design/integrity-backup.html: source of truth versus rebuildable for every table and file, checksum rules, recovery path per class; DB, GIT and MED items conform to it [0.1] — needs: RES.26, RES.27, RES.28
 - [ ] **INT.2** Schema integrity rules: migration records carry a content hash and refuse to run on a mismatch, row checksums on source-of-truth tables, hash-chained audit log; added as a migration on top of DB.2 [0.1] — needs: DB.2, INT.1
 - [ ] **INT.3** Hash manifest library: compute and verify SHA-256 manifests per directory with atomic writes, used by every store [0.1] — needs: FND.11, INT.1
 - [ ] **INT.4** Content store checks: git fsck after maintenance and on schedule, ref and HEAD verification, page files compared with the MySQL index [0.2] — needs: GIT.1, INT.3
@@ -449,7 +449,7 @@ Issue: [#54](https://github.com/dwhagar/spakr/issues/54)
 
 Owner decision: nightly backups of all data stored in /data/backups, each with a parity file; tar.bz2 by default, gz as an option. Built on the INT category (checksums, manifests, parity) and ordered so the basics (settings, layout, manifest, DB dump, config policy, restore) land first.
 
-- [ ] **BAK.1** Backup design recorded in docs/design/backups.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1 — progress: written as docs/design/integrity-backup.html; owner decision 2026-10-29: core archive plus content-addressed media pool; done when the journal card is answered
+- [x] **BAK.1** Backup design recorded in docs/design/integrity-backup.html: what a backup contains, naming, manifest, parity, retention, secrets policy, restore order, which data is source of truth (INT.1) [0.1] — needs: RES.30, RES.31, INT.1
 - [ ] **BAK.2** Backup settings in config.json.example and the settings registry: enabled, directory (default /data/backups), format bz2 (default) or gz, parity redundancy percent, retention, off-host command, alert on failure, stale-after hours; validated [0.1] — needs: CFG.1, CFG.2, BAK.1
 - [ ] **BAK.3** Directory layout and permissions: /data/backups created at startup, directory 0700 and files 0600 owned by the dedicated user; refuses to run when the path is world-readable or under a web-served path [0.1] — needs: FND.11, BAK.1
 - [ ] **BAK.4** Backup manifest on the INT.3 helper: manifest.json per backup with name, time, software, API and schema versions, format, component list, SHA-256 and size per file, written atomically [0.1] — needs: INT.3, BAK.1
