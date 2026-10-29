@@ -15,6 +15,7 @@ All notable changes to spakr are recorded here, newest first. Versions are `MAJO
 - Content store research (RES.29 done): git versus MySQL for page content measured on this machine (saves, concurrency, history, blame, growth, backups) and corruption trials (git fsck detection, par2 repair of a damaged pack, InnoDB page damage). Recommendation: keep git as the source of truth with a rebuildable MySQL index; new item GIT.9 (complete front matter). Feeds RES.26, RES.27 and the INT items. Benchmark script `docs/research/poc/store_bench.py`.
 
 ### Changed
+- Owner decision: the starter relation vocabulary is the 18 kinds in the content-model design plus a family set (parent_of/child_of, partner_of, sibling_of) (LNK.3). DOC.12 done: every owner question from the two design documents is answered or defaulted.
 - Owner decisions: 1.0 exchange formats are the native bundle, single-page Markdown, Markdown folder import and CSV (OPS.6, OPS.11 to OPS.14); only admins may import or export (OPS.15).
 - Owner decision: MySQL-only data (accounts, keys, settings, audit) is journaled from the start (INT.9); INT.1 and BAK.1 done, with docs/design/integrity-backup.html as the specification.
 - Owner decision: GM-only content can be a whole page or a section inside a public page (new VIS.4 to VIS.9: section syntax, public and GM cache variants, search, history and diff, non-GM editing, leak tests).
