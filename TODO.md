@@ -36,7 +36,7 @@ Issue: [#9](https://github.com/dwhagar/spakr/issues/9)
 - [x] **DOC.9** Component checklist (docs/plan/components.html) first pass done and kept in step with TODO.md: every component mapped to items, gaps flagged; to be aligned with the component research catalogue [0.0]
 - [x] **DOC.10** Content model and exchange design specification in docs/design (thread "Design: content model and exchange"): entity field schemas and front matter (RES.13), page types, infobox, import and export formats (RES.19), with owner question cards [0.0]
 - [x] **DOC.11** Data integrity and backup design specification in docs/design (thread "Design: data integrity and backup"): parity, source of truth and rebuildable data, checksums, backup design (RES.26 to RES.28, RES.30), with owner question cards [0.0]
-- [ ] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — progress: 7 decision cards posted 2026-10-22 (see docs/plan/questions.html); the rest take the design documents' recommendations unless Boss objects — needs: DOC.10, DOC.11
+- [x] **DOC.12** Owner question cards compiled from the design documents and the open questions, ordered by what blocks the most work [0.0] — progress: 7 decision cards posted 2026-10-22 (see docs/plan/questions.html); the rest take the design documents' recommendations unless Boss objects — needs: DOC.10, DOC.11
 - [ ] **DOC.8** Media management guide: library, metadata, moderation, takedown, prune policy and the systemd timer [0.9] — needs: UI.23, MED.27
 
 ## FND: Foundation
@@ -186,7 +186,7 @@ Issue: [#20](https://github.com/dwhagar/spakr/issues/20)
 
 - [ ] **LNK.1** Wiki-style links between pages [0.6] — needs: RND.1, GIT.5
 - [ ] **LNK.2** Backlinks [0.6] — needs: LNK.1
-- [ ] **LNK.3** Relations between pages, using the fixed admin-managed relation_kind vocabulary (decided) [0.6] — needs: ENT.1, DB.2
+- [ ] **LNK.3** Relations between pages, using the fixed admin-managed relation_kind vocabulary (decided) [0.6] — needs: ENT.1, DB.2 — progress: starter vocabulary is the 18 kinds in the content-model design plus parent_of/child_of, partner_of and sibling_of (owner decision 2026-10-29)
 - [ ] **LNK.4** Browse by type and setting [0.6] — needs: ENT.1, API.5
 - [ ] **LNK.5** Tags [0.6] — needs: ENT.1
 - [ ] **LNK.6** Admin API and screen for the relation_kind vocabulary (add, rename, retire, reorder; starter set seeded by migration) [0.6] — needs: LNK.3, AUTH.8
